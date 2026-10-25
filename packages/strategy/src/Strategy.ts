@@ -3,7 +3,7 @@ import type { StrategyStats } from "./StrategyStats";
 import type { ExecutionMode } from "$execution/ExecutionMode";
 
 /**
- * Strategy interface — simplified for TypeScript (no RxJava, no ExchangeSupport).
+ * Strategy interface — simplified for TypeScript (no RxJava).
  * Port of com.wualabs.qtsurfer.engine.strategy.Strategy
  */
 export interface Strategy {

@@ -55,7 +55,7 @@ AbstractStrategy
 
 **`Kline`** — OHLCV candlestick bar. Fields: `open`, `high`, `low`, `close`, `volume`, `quoteVolume`, `numberOfTrades`, `timestamp`, `instrument`.
 
-Both are the canonical engine types — no XChange dependency.
+Both are the engine's own types.
 
 ### Ticker Strategy
 

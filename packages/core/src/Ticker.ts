@@ -1,6 +1,5 @@
 /**
- * Ticker market data interface.
- * Port of org.knowm.xchange.dto.marketdata.Ticker
+ * Ticker market data interface. The engine's own type: a price or size is `null` when the source does not report it.
  */
 export interface Ticker {
   instrument: string;
