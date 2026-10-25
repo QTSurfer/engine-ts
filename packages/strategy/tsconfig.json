@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "$event/*": ["src/event/*"],
+      "$signal/*": ["src/event/signal/*"],
+      "$yield/*": ["src/event/yield/*"],
+      "$execution/*": ["src/execution/*"]
+    }
+  },
+  "include": ["src"]
+}

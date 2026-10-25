@@ -1,0 +1,24 @@
+{
+  "name": "@qtsurfer/indicators-trading-signals",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "RT Indicators vs trading-signals comparison tests and benchmarks",
+  "license": "AGPL-3.0-only OR LicenseRef-Wualabs-Commercial",
+  "scripts": {
+    "test": "vitest run",
+    "bench": "vitest bench",
+    "coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=text --coverage.include=src/**"
+  },
+  "dependencies": {
+    "trading-signals": "^7.4.3"
+  },
+  "peerDependencies": {
+    "@qtsurfer/indicators": "workspace:*"
+  },
+  "devDependencies": {
+    "@qtsurfer/indicators": "workspace:*",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  }
+}

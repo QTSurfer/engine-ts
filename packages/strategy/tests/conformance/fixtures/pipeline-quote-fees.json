@@ -1,0 +1,63 @@
+{
+  "name": "pipeline-quote-fees",
+  "tier": "pipeline",
+  "description": "Single LONG round trip with FeeLeg.QUOTE: the fee is charged in QUOTE on BOTH sides (perps / cash-PnL convention). The buy fee is reserved out of the all-in cash at the SIZING layer (base / (1 + feeRate)), so cost*(1+rate) == funding with zero residual and no negative balance — reducing the fill at the execution layer would instead trip the partial-fill detector and cancel the entry. With funding 1000 @ price 100 the buy sizes 10/1.001 = 9.990009990 base (cost 999.000999 + 0.999000999 USDT fee = 1000). The yield is expressed against the entry COST basis (input = base*price = 999.000999, excluding the separately-tracked quote buy fee), with the buy fee folded into the realized output, so pnl (97.802198) and finalBalance (1097.802198) are exact — you turn 1000 into 1097.802198. The DISTINGUISHING signal vs RECEIVED is feesByAsset: QUOTE records BOTH fees in quote (2.097902 USDT) with NO base-asset entry (RECEIVED records 0.01 BTC on the buy).",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0.001,
+    "feeLeg": "QUOTE",
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "signals": [
+    {
+      "kind": "buy",
+      "price": 100,
+      "timestamp": 1700000000000
+    },
+    {
+      "kind": "sell",
+      "price": 110,
+      "timestamp": 1715778800000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "price": 100,
+          "baseNet": 9.990009990009990,
+          "cost": 999.000999000999,
+          "feeQuote": 0.999000999000999
+        },
+        {
+          "side": "sell",
+          "price": 110,
+          "baseSold": 9.990009990009990,
+          "quoteGross": 1098.9010989010989,
+          "feeQuote": 1.0989010989010989,
+          "quoteReceived": 1097.8021978021978
+        }
+      ],
+      "yield": {
+        "input": 999.000999000999,
+        "output": 1096.8031968031968,
+        "pnl": 97.8021978021978,
+        "percent": 9.78999
+      },
+      "finalBalance": 1097.8021978021978,
+      "feesByAsset": {
+        "USDT": 2.0979020979020979
+      },
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-06,
+    "ratios": 0.0001
+  }
+}

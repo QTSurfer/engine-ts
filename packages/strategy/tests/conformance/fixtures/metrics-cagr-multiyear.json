@@ -1,0 +1,41 @@
+{
+  "name": "metrics-cagr-multiyear",
+  "tier": "metrics",
+  "description": "Two winning trades on fixed 1000 invested, spaced EXACTLY 730.5 days (two 365.25-day years) apart. Pins the CAGR annualization exponent: with a 2-year span the exponent is 1/2, so cagr (0.10) MUST differ from pnlTotalPercent (21%). The metrics-mixed-trades fixture cannot guard this — its 365.25-day span makes the exponent exactly 1, where annualized CAGR and total return coincide, so a bug that returned total return instead of CAGR would pass there. (1210/1000)^(1/2) - 1 = 0.10. Sharpe/Sortino are intentionally not asserted here: with two same-sign returns Sortino's downside set is empty (degenerate); this fixture is CAGR-focused.",
+  "initialCapital": 1000,
+  "instrument": "BTC/USDT",
+  "currency": "USDT",
+  "yields": [
+    {
+      "input": 1000,
+      "output": 1100,
+      "timestamp": 1700000000000
+    },
+    {
+      "input": 1000,
+      "output": 1110,
+      "timestamp": 1763115200000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "totalTrades": 2,
+      "winCount": 2,
+      "lossCount": 0,
+      "winRate": 1.0,
+      "pnlTotal": 210,
+      "pnlTotalPercent": 21.0,
+      "cagr": 0.1,
+      "maxDrawdown": 0,
+      "maxDrawdownPercent": 0,
+      "equityCurve": [
+        1100,
+        1210
+      ]
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

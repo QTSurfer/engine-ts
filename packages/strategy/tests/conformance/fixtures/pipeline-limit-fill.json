@@ -1,0 +1,74 @@
+{
+  "name": "pipeline-limit-fill",
+  "tier": "pipeline",
+  "description": "Pending-order queue: a LIMIT BUY entry resolves one tick after submission and fills AT the limit price, tagged MAKER; the exit is a plain market SELL, tagged TAKER. Maker/taker fee model (maker 0.001, taker 0.002), RECEIVED leg, funding 1000. Tick script: t1 last=105 -> the strategy emits a BuySignal with orderKind=limit and price=100 (enqueued, not filled on this tick); t2 last=99 -> the pending order resolves BEFORE the strategy sees t2 (99 <= 100) and fills AT 100 as MAKER: baseGross = 10, feeBase = 10*0.001 = 0.01, baseNet = 9.99; t3 last=110 -> the strategy emits a market SellSignal, TAKER: quoteGross = 9.99*110 = 1098.9, feeQuote = 1098.9*0.002 = 2.1978, quoteNet = 1096.7022. Deliberately the same arithmetic as pipeline-asymmetric-fees.json (buy 0.1%, sell 0.2%): this fixture pins that a LIMIT fill routes as MAKER end to end through the pending-order queue, not that the numbers are novel.",
+  "config": {
+    "initialFunding": 1000,
+    "makerRate": 0.001,
+    "takerRate": 0.002,
+    "feeLeg": "RECEIVED",
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "ticks": [
+    {
+      "seq": 1,
+      "last": 105,
+      "timestamp": 1700000000000,
+      "action": "strategy emits BuySignal orderKind=limit price=100"
+    },
+    {
+      "seq": 2,
+      "last": 99,
+      "timestamp": 1700000060000,
+      "action": "resolves pending limit buy (99<=100), fills AT 100, tagged MAKER"
+    },
+    {
+      "seq": 3,
+      "last": 110,
+      "timestamp": 1700000120000,
+      "action": "strategy emits SellSignal orderKind=market price=110, tagged TAKER"
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "orderKind": "limit",
+          "liquidity": "maker",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0.01,
+          "baseNet": 9.99,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "orderKind": "market",
+          "liquidity": "taker",
+          "price": 110,
+          "baseSold": 9.99,
+          "quoteGross": 1098.9,
+          "feeQuote": 2.1978,
+          "quoteNet": 1096.7022
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 1096.7022,
+        "pnl": 96.7022,
+        "percent": 9.67022
+      },
+      "finalBalance": 1096.7022,
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-06,
+    "ratios": 0.0001
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "name": "@qtsurfer/indicators",
+  "version": "0.12.2",
+  "type": "module",
+  "description": "QTSurfer Real-Time Streaming Indicators",
+  "license": "AGPL-3.0-only OR LicenseRef-Wualabs-Commercial",
+  "author": "QTSurfer (https://qtsurfer.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QTSurfer/engine-ts.git",
+    "directory": "packages/indicators"
+  },
+  "bugs": {
+    "url": "https://github.com/QTSurfer/engine-ts/issues"
+  },
+  "homepage": "https://github.com/QTSurfer/engine-ts/tree/main/packages/indicators#readme",
+  "keywords": [
+    "qtsurfer",
+    "trading",
+    "technical-analysis",
+    "indicators",
+    "streaming",
+    "real-time",
+    "ema",
+    "rsi",
+    "macd",
+    "bollinger",
+    "typescript"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "bench": "vitest bench",
+    "bench:cross-runtime": "node bench/cross-runtime/run.mjs",
+    "lint": "tsc --noEmit",
+    "coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=text --coverage.include=src/**"
+  },
+  "files": [
+    "dist",
+    "LICENSING.md",
+    "STRATEGY-EXCEPTION.md"
+  ],
+  "dependencies": {
+    "@qtsurfer/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

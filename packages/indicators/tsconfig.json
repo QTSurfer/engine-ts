@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "$core/*": ["src/core/*"],
+      "$averages/*": ["src/averages/*"],
+      "$bollinger/*": ["src/bollinger/*"],
+      "$numeric/*": ["src/numeric/*"],
+      "$statistics/*": ["src/statistics/*"],
+      "$helpers/*": ["src/helpers/*"],
+      "$indicators/*": ["src/indicators/*"],
+      "$group/*": ["src/group/*"]
+    }
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,59 @@
+{
+  "name": "metrics-mixed-trades",
+  "tier": "metrics",
+  "description": "Four trades (+10%, -5%, 0%, +3%) on fixed 1000 invested, spread exactly over 365.25 days. Pins the metric definitions: zero-yield win/loss classification, Sortino denominator, CAGR definition/units. Also pins the weeklyReturns vector: 53 fixed 7-day buckets from the first yield's timestamp, dense (empty buckets are 0).",
+  "initialCapital": 1000,
+  "instrument": "BTC/USDT",
+  "currency": "USDT",
+  "yields": [
+    {
+      "input": 1000,
+      "output": 1100,
+      "timestamp": 1700000000000
+    },
+    {
+      "input": 1000,
+      "output": 950,
+      "timestamp": 1710519200000
+    },
+    {
+      "input": 1000,
+      "output": 1000,
+      "timestamp": 1721038400000
+    },
+    {
+      "input": 1000,
+      "output": 1030,
+      "timestamp": 1731557600000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "totalTrades": 4,
+      "winCount": 2,
+      "lossCount": 2,
+      "winRate": 0.5,
+      "pnlTotal": 80,
+      "pnlTotalPercent": 8.0,
+      "sharpeRatio": 0.36823,
+      "sortinoRatio": 0.8,
+      "cagr": 0.08,
+      "maxDrawdown": 50,
+      "maxDrawdownPercent": 4.54545,
+      "equityCurve": [
+        1100,
+        1050,
+        1050,
+        1080
+      ],
+      "weeklyReturns": [
+        100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -50, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 30
+      ]
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

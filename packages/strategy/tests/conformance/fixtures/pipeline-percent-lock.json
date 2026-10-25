@@ -1,0 +1,53 @@
+{
+  "name": "pipeline-percent-lock",
+  "tier": "pipeline",
+  "description": "Fractional entry sizing via percentAmountToLock: funding 1000, percentAmountToLock 50, zero fees, buy@100 then sell@110. The entry is sized to 50% of the available funds, so the round trip trades 5 base (500 quote) instead of the all-in 10. Because the percentage scales the amount actually committed to the entry, the yield cost basis is the 500 spent, not the full 1000: input 500, output 550, pnl +50, final equity 1000 - 500 + 550 = 1050. Pins that fractional sizing is honoured end to end without a separate backtest setting.",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0,
+    "percentAmountToLock": 50,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "signals": [
+    {
+      "kind": "buy",
+      "price": 100,
+      "timestamp": 1700000000000
+    },
+    {
+      "kind": "sell",
+      "price": 110,
+      "timestamp": 1715778800000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "price": 100,
+          "baseGross": 5,
+          "quoteSpent": 500
+        },
+        {
+          "side": "sell",
+          "price": 110,
+          "baseSold": 5,
+          "quoteGross": 550
+        }
+      ],
+      "yield": {
+        "input": 500,
+        "output": 550,
+        "pnl": 50,
+        "percent": 10.0
+      },
+      "finalBalance": 1050
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

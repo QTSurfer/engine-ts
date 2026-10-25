@@ -1,0 +1,79 @@
+{
+  "name": "pipeline-trailing-stop",
+  "tier": "pipeline",
+  "description": "Trailing stop resolved as a percent from the extreme. A SellSignal orderKind=stopTrailing tracks a running MAX(extreme, tick.last()) seeded with the signal's own price, and fires when last retraces trailPercent% from that extreme, filling AT the trigger level. Funding 1000, zero fees, trailPercent 10. Tick script: t1 last=100 -> BuySignal market fills 10 base @100; t2 last=120 -> strategy emits SellSignal orderKind=stopTrailing price=120 trailPercent=10 (enqueued, extreme seeded 120, trigger level 120*0.9=108); t3 last=125 -> resolved before the strategy sees t3: extreme -> max(120,125)=125, trigger level 125*0.9=112.5, no fire (125>112.5); t4 last=111 -> extreme stays 125 (111<125), trigger level still 112.5, fires (111<=112.5), fills AT 112.5 -> output 1125, input 1000, pnl +125, final equity 1125.",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0.0,
+    "trailPercent": 10,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "ticks": [
+    {
+      "seq": 1,
+      "last": 100,
+      "timestamp": 1700000000000,
+      "action": "strategy emits BuySignal orderKind=market"
+    },
+    {
+      "seq": 2,
+      "last": 120,
+      "timestamp": 1700000060000,
+      "action": "strategy emits SellSignal orderKind=stopTrailing price=120 trailPercent=10 (extreme seeded 120, trigger 108)"
+    },
+    {
+      "seq": 3,
+      "last": 125,
+      "timestamp": 1700000120000,
+      "action": "resolves: extreme->125, trigger 112.5, no fire (125>112.5)"
+    },
+    {
+      "seq": 4,
+      "last": 111,
+      "timestamp": 1700000180000,
+      "action": "resolves: extreme stays 125, trigger 112.5, fires (111<=112.5), fills AT 112.5"
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "orderKind": "market",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0,
+          "baseNet": 10,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "orderKind": "stopTrailing",
+          "liquidity": "taker",
+          "price": 112.5,
+          "extremeAtTrigger": 125,
+          "baseSold": 10,
+          "quoteGross": 1125,
+          "feeQuote": 0,
+          "quoteNet": 1125
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 1125,
+        "pnl": 125,
+        "percent": 12.5
+      },
+      "finalBalance": 1125,
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-06,
+    "ratios": 0.0001
+  }
+}

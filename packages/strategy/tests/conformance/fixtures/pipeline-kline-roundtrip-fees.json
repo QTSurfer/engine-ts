@@ -1,0 +1,60 @@
+{
+  "name": "pipeline-kline-roundtrip-fees",
+  "tier": "pipeline",
+  "description": "Bar-path counterpart of pipeline-long-roundtrip-fees.json: the same canonical numbers, but the runner replays closed 1m Kline bars instead of ticks. Each signal's price and timestamp becomes a flat-OHLC bar's close and timestamp, driven through a kline strategy and the production execution pipeline, with the same fee math (0.1% on both sides) as the ticker fixture. It pins that the bar path reuses the pipeline and is not a second simulator.",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0.001,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "signals": [
+    {
+      "kind": "buy",
+      "price": 100,
+      "timestamp": 1700000000000
+    },
+    {
+      "kind": "sell",
+      "price": 110,
+      "timestamp": 1715778800000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0.01,
+          "baseNet": 9.99,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "baseSold": 9.99,
+          "price": 110,
+          "quoteGross": 1098.9,
+          "feeQuote": 1.0989,
+          "quoteNet": 1097.8011
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 1097.8011,
+        "pnl": 97.8011,
+        "percent": 9.78011
+      },
+      "finalBalance": 1097.8011,
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

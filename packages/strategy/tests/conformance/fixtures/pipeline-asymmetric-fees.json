@@ -1,0 +1,62 @@
+{
+  "name": "pipeline-asymmetric-fees",
+  "tier": "pipeline",
+  "description": "Single LONG round trip with DIFFERENT per-side fee rates (buy 0.1% in base, sell 0.2% in quote), all-in buy@100, sell@110, half of 365.25d apart. Pins the per-side fee wiring: the runner/pipeline must route buyFeeRate to the buy fill (base) and sellFeeRate to the sell fill (quote), not a single shared rate. A symmetric-only implementation that applied one rate to both sides would produce output 1097.8011 (the pipeline-long-roundtrip-fees value) instead of 1096.7022. Note: metrics.cagrPercent is asserted by neither harness (single yield → first==last timestamp → CAGR=0 both engines); see metrics-cagr-multiyear.json for the CAGR contract.",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0.001,
+    "buyFeeRate": 0.001,
+    "sellFeeRate": 0.002,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "signals": [
+    {
+      "kind": "buy",
+      "price": 100,
+      "timestamp": 1700000000000
+    },
+    {
+      "kind": "sell",
+      "price": 110,
+      "timestamp": 1715778800000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0.01,
+          "baseNet": 9.99,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "price": 110,
+          "baseSold": 9.99,
+          "quoteGross": 1098.9,
+          "feeQuote": 2.1978,
+          "quoteNet": 1096.7022
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 1096.7022,
+        "pnl": 96.7022,
+        "percent": 9.67022
+      },
+      "finalBalance": 1096.7022,
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

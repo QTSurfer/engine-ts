@@ -1,0 +1,72 @@
+{
+  "name": "pipeline-stop-loss",
+  "tier": "pipeline",
+  "description": "Stop-loss attached to an entry: a filled market BUY carrying setStopPrice(90) automatically places a pending STOP-SELL into the pending-order queue; the sell amount comes from the pipeline's own position state at trigger time, not from anything stored on the pending order. Funding 1000, zero fees. Tick script: t1 last=100 -> BuySignal market with setStopPrice(90) fills 10 base @100 (zero fee), stop-sell@90 auto-enqueued; t2 last=95 -> resolved before the strategy sees t2, no trigger (95 > 90); t3 last=89 -> triggers (89 <= 90), fills AT 90 -> output 900, input 1000, pnl -100, final equity 900. Pins the stop-loss attachment end to end.",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0.0,
+    "stopPrice": 90,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "ticks": [
+    {
+      "seq": 1,
+      "last": 100,
+      "timestamp": 1700000000000,
+      "action": "strategy emits BuySignal orderKind=market with setStopPrice(90)"
+    },
+    {
+      "seq": 2,
+      "last": 95,
+      "timestamp": 1700000060000,
+      "action": "resolves pending stop-sell: 95>90, no trigger"
+    },
+    {
+      "seq": 3,
+      "last": 89,
+      "timestamp": 1700000120000,
+      "action": "resolves pending stop-sell: 89<=90, fires, fills AT 90"
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "orderKind": "market",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0,
+          "baseNet": 10,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "orderKind": "stop",
+          "liquidity": "taker",
+          "price": 90,
+          "baseSold": 10,
+          "quoteGross": 900,
+          "feeQuote": 0,
+          "quoteNet": 900
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 900,
+        "pnl": -100,
+        "percent": -10
+      },
+      "finalBalance": 900,
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 0
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-06,
+    "ratios": 0.0001
+  }
+}

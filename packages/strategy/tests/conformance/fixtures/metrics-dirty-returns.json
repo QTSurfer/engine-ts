@@ -1,0 +1,110 @@
+{
+  "name": "metrics-dirty-returns",
+  "tier": "metrics",
+  "description": "Four trades with returns that are not exact at two significant digits (+9.78011%, -4.56789%, +0.37%, +12.3456%) on fixed 1000 invested over exactly 365.25 days. Pins that Sharpe and Sortino are computed over the EXACT per-trade return, not a return rounded to two significant digits. The sibling metrics-mixed-trades fixture cannot catch this: its returns (+10/-5/0/+3) are all exact at two significant digits.",
+  "initialCapital": 1000,
+  "instrument": "BTC/USDT",
+  "currency": "USDT",
+  "yields": [
+    {
+      "input": 1000,
+      "output": 1097.8011,
+      "timestamp": 1700000000000
+    },
+    {
+      "input": 1000,
+      "output": 954.3211,
+      "timestamp": 1710519200000
+    },
+    {
+      "input": 1000,
+      "output": 1003.7,
+      "timestamp": 1721038400000
+    },
+    {
+      "input": 1000,
+      "output": 1123.456,
+      "timestamp": 1731557600000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "totalTrades": 4,
+      "winCount": 3,
+      "lossCount": 1,
+      "winRate": 0.75,
+      "pnlTotal": 179.2782,
+      "pnlTotalPercent": 17.92782,
+      "sharpeRatio": 0.65252,
+      "sortinoRatio": 1.96237,
+      "cagr": 0.1792782,
+      "maxDrawdown": 45.6789,
+      "maxDrawdownPercent": 4.16095,
+      "equityCurve": [
+        1097.8011,
+        1052.1222,
+        1055.8222,
+        1179.2782
+      ],
+      "weeklyReturns": [
+        97.8011,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -45.6789,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        3.7,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        123.456
+      ]
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

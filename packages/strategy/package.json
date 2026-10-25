@@ -1,0 +1,60 @@
+{
+  "name": "@qtsurfer/strategy",
+  "version": "0.12.2",
+  "type": "module",
+  "description": "QTSurfer Strategy — strategy framework for trading signals",
+  "license": "AGPL-3.0-only OR LicenseRef-Wualabs-Commercial",
+  "author": "QTSurfer (https://qtsurfer.com)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QTSurfer/engine-ts.git",
+    "directory": "packages/strategy"
+  },
+  "bugs": {
+    "url": "https://github.com/QTSurfer/engine-ts/issues"
+  },
+  "homepage": "https://github.com/QTSurfer/engine-ts/tree/main/packages/strategy#readme",
+  "keywords": [
+    "qtsurfer",
+    "trading",
+    "backtesting",
+    "strategy",
+    "signals",
+    "typescript"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "coverage": "vitest run --coverage --coverage.reporter=text-summary --coverage.reporter=text --coverage.include=src/**"
+  },
+  "files": [
+    "dist",
+    "LICENSING.md",
+    "STRATEGY-EXCEPTION.md"
+  ],
+  "dependencies": {
+    "@qtsurfer/core": "workspace:*",
+    "@qtsurfer/indicators": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.5"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

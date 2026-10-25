@@ -1,0 +1,65 @@
+{
+  "name": "pipeline-maker-taker",
+  "tier": "pipeline",
+  "description": "Single LONG round trip with a maker/taker fee model (makerRate 0.0005, takerRate 0.002), same funding and prices as pipeline-long-roundtrip-fees.json (all-in buy@100, sell@110). Both legs are plain market fills and a market fill always takes liquidity, so BOTH sides are charged the TAKER rate (0.002), never the MAKER rate (0.0005); the maker rate only applies to resting limit fills (see pipeline-limit-fill.json). This pins that a market fill routes through the fee model as taker: a bug that mis-routed market fills as maker would land feeBase 0.005, feeQuote 0.549725 and output 1098.900275 instead of the canonical numbers below. Derivation (all-in base = 1000/100 = 10, RECEIVED leg, rate 0.002 on both sides since both are TAKER): buy feeBase = 10*0.002 = 0.02, baseNet = 9.98; sell quoteGross = 9.98*110 = 1097.8, feeQuote = 1097.8*0.002 = 2.1956, quoteNet = 1097.8 - 2.1956 = 1095.6044.",
+  "config": {
+    "initialFunding": 1000,
+    "makerRate": 0.0005,
+    "takerRate": 0.002,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "signals": [
+    {
+      "kind": "buy",
+      "price": 100,
+      "timestamp": 1700000000000
+    },
+    {
+      "kind": "sell",
+      "price": 110,
+      "timestamp": 1715778800000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0.02,
+          "baseNet": 9.98,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "price": 110,
+          "baseSold": 9.98,
+          "quoteGross": 1097.8,
+          "feeQuote": 2.1956,
+          "quoteNet": 1095.6044
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 1095.6044,
+        "pnl": 95.6044,
+        "percent": 9.56044
+      },
+      "finalBalance": 1095.6044,
+      "feesByAsset": {
+        "BTC": 0.02,
+        "USDT": 2.1956
+      },
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-06,
+    "ratios": 0.0001
+  }
+}

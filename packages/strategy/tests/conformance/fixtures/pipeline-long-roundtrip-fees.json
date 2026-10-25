@@ -1,0 +1,61 @@
+{
+  "name": "pipeline-long-roundtrip-fees",
+  "tier": "pipeline",
+  "description": "Single LONG round trip with 0.1% fee on both sides per the canonical contract (FeeLeg.RECEIVED): all-in buy@100, sell@110, half of 365.25d apart. Pins the both-side fee math. Note: metrics.cagr documents the value over the half-year the signals span (a window under one year is not annualized, so it is the plain return 0.0978011) but is asserted by neither harness — a single yield gives first==last timestamp, where CAGR=0; a multi-trade pipeline fixture would exercise it.",
+  "config": {
+    "initialFunding": 1000,
+    "feeRate": 0.001,
+    "currency": "USDT",
+    "instrument": "BTC/USDT"
+  },
+  "signals": [
+    {
+      "kind": "buy",
+      "price": 100,
+      "timestamp": 1700000000000
+    },
+    {
+      "kind": "sell",
+      "price": 110,
+      "timestamp": 1715778800000
+    }
+  ],
+  "expected": {
+    "canonical": {
+      "fills": [
+        {
+          "side": "buy",
+          "price": 100,
+          "baseGross": 10,
+          "feeBase": 0.01,
+          "baseNet": 9.99,
+          "quoteSpent": 1000
+        },
+        {
+          "side": "sell",
+          "price": 110,
+          "baseSold": 9.99,
+          "quoteGross": 1098.9,
+          "feeQuote": 1.0989,
+          "quoteNet": 1097.8011
+        }
+      ],
+      "yield": {
+        "input": 1000,
+        "output": 1097.8011,
+        "pnl": 97.8011,
+        "percent": 9.78011
+      },
+      "finalBalance": 1097.8011,
+      "metrics": {
+        "totalTrades": 1,
+        "winCount": 1,
+        "cagr": 0.0978011
+      }
+    }
+  },
+  "tolerances": {
+    "amounts": 1e-09,
+    "ratios": 0.0001
+  }
+}

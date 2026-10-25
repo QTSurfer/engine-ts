@@ -1,0 +1,31 @@
+{
+  "name": "@qtsurfer/engine-ts",
+  "version": "0.0.1",
+  "private": true,
+  "description": "QTSurfer Engine — TypeScript monorepo",
+  "license": "AGPL-3.0-only OR LicenseRef-Wualabs-Commercial",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "node scripts/check-license-files.mjs && pnpm -r test",
+    "check:license": "node scripts/check-license-files.mjs",
+    "coverage": "pnpm -r --if-present coverage",
+    "check": "pnpm -r lint",
+    "lint": "pnpm -r lint",
+    "clean": "pnpm -r clean",
+    "release": "changeset publish"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.31.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "tsup": "^8.5.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/QTSurfer/engine-ts.git"
+  }
+}
