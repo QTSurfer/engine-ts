@@ -2,8 +2,11 @@
 
 ## Reporting a vulnerability
 
-Please report a vulnerability **privately**, by e-mail to <security@wualabs.com>. Do not open a public issue or
-pull request for it.
+Please report a vulnerability **privately**. Do not open a public issue or pull request for it.
+
+- Preferred: [report it on GitHub](https://github.com/QTSurfer/engine-ts/security/advisories/new) (the repository's
+  Security tab, "Report a vulnerability"). Only you and the maintainers see the report.
+- Or by e-mail to <security@wualabs.com>.
 
 Include what you found, the package and version, and how to reproduce it (a small program or test is best). We
 acknowledge reports, tell you what we decide, and credit you in the release notes if you wish. We ask you to give
