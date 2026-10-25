@@ -224,4 +224,4 @@ allows. Contributions need the [Wualabs CLA](CLA.md) ([CONTRIBUTING.md](CONTRIBU
 
 ## Security
 
-Report a vulnerability privately to <security@wualabs.com>; see [SECURITY.md](SECURITY.md).
+To report a vulnerability privately, see [SECURITY.md](SECURITY.md).
