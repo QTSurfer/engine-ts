@@ -17,7 +17,9 @@ function sources(dir: string): string[] {
 
 const text = sources(src).map((file) => readFileSync(file, "utf8"));
 const concrete = text.flatMap((t) => [...t.matchAll(/^export class ([A-Za-z]+RTIndicator)\b/gm)].map((m) => m[1]!));
-const everything = new Set(text.flatMap((t) => [...t.matchAll(/^export (?:abstract )?class ([A-Za-z]+RTIndicator)\b/gm)].map((m) => m[1]!)));
+const everything = new Set(
+  text.flatMap((t) => [...t.matchAll(/^export (?:abstract )?(?:class|interface) ([A-Za-z]+RTIndicator)\b/gm)].map((m) => m[1]!)),
+);
 const mentioned = new Set([...md.matchAll(/`([A-Za-z]+RTIndicator)`/g)].map((m) => m[1]!));
 
 describe("indicators.md", () => {

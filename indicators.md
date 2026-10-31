@@ -8,16 +8,17 @@ Update the row in the same change that adds a class or a builder method:
 - **Builder** — the method of `InstrumentGroupRTIndicator` that registers it by name; `—` when none does, and the class is
   added with `group.add(name, new Class(…))`.
 - **Bars** — it reads a whole bar (high, low, close) and not a single value, so it belongs on a kline group: on a ticker those
-  are the exchange's 24-hour statistics.
+  are the exchange's 24-hour statistics. Such a class implements `RichRTIndicator` and returns `true` from `requiresBarData()`;
+  a group fed from a ticker reports it once, with an `IndicatorNotice`, through `getNotices()`.
 
 ## Summary
 
 | Group | Indicators | With a builder method |
 |---|---:|---:|
-| Averages | 8 | 2 |
+| Averages | 8 | 7 |
 | Oscillators | 4 | 4 |
-| Bands | 3 | 2 |
-| Volatility | 5 | 0 |
+| Bands | 3 | 3 |
+| Volatility | 5 | 5 |
 | Distance and change | 4 | 3 |
 | Counting and extremes | 6 | 5 |
 
@@ -27,12 +28,12 @@ Update the row in the same change that adds a class or a builder method:
 |---|---|---|---|---|
 | SMA | `SmaRTIndicator` | `sma` |  | discrete and moving modes |
 | EMA | `EmaRTIndicator` | `ema` |  |  |
-| WMA | `WmaRTIndicator` | — |  |  |
-| WMA, incremental | `WmaIncrementalRTIndicator` | — |  | O(1) per update |
-| TEMA | `TemaRTIndicator` | — |  |  |
-| HMA | `HmaRTIndicator` | — |  |  |
-| KAMA | `KamaRTIndicator` | — |  |  |
-| MMA (Wilder's smoothing) | `MmaRTIndicator` | — |  |  |
+| WMA | `WmaRTIndicator` | — |  | O(window) per update; `wma` registers the incremental form below |
+| WMA, incremental | `WmaIncrementalRTIndicator` | `wma` |  | O(1) per update |
+| TEMA | `TemaRTIndicator` | `tema` |  |  |
+| HMA | `HmaRTIndicator` | `hma` |  |  |
+| KAMA | `KamaRTIndicator` | `kama` |  | efficiency ratio, fast and slow periods |
+| MMA (Wilder's smoothing) | `MmaRTIndicator` | `mma` |  |  |
 
 ## Oscillators
 
@@ -49,17 +50,17 @@ Update the row in the same change that adds a class or a builder method:
 |---|---|---|---|---|
 | Bollinger Bands | `BollingerBandsRTIndicator` | `bollinger` |  |  |
 | Bollinger BandWidth | `BollingerBandWidthRTIndicator` | `bollingerBandwidth` |  |  |
-| Bollinger %B | `BollingerPercentBRTIndicator` | — |  |  |
+| Bollinger %B | `BollingerPercentBRTIndicator` | `bollingerPercentB` |  | carries bands of its own |
 
 ## Volatility
 
 | Indicator | Class | Builder | Bars | Notes |
 |---|---|---|---|---|
-| ATR | `AtrRTIndicator` | — | yes | Wilder's smoothing, O(1) per update; the class does not declare that it reads bars |
-| Standard deviation | `StandardDeviationRTIndicator` | — |  |  |
-| Variance | `VarianceRTIndicator` | — |  |  |
-| Volatility | `VolatilityRTIndicator` | — |  |  |
-| % Volatility | `PercentVolatilityRTIndicator` | — |  |  |
+| ATR | `AtrRTIndicator` | `atr` | yes | Wilder's smoothing, O(1) per update; declares `requiresBarData()` |
+| Standard deviation | `StandardDeviationRTIndicator` | `stdDev` |  |  |
+| Variance | `VarianceRTIndicator` | `variance` |  |  |
+| Volatility | `VolatilityRTIndicator` | `volatility` |  | average of how often the price changes |
+| % Volatility | `PercentVolatilityRTIndicator` | `percentVolatility` |  |  |
 
 ## Distance and change
 
