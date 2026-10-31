@@ -5,6 +5,18 @@ import type { RTIndicator } from "$core/RTIndicator";
 import { StateStore, TickerValueSource, predicates } from "@qtsurfer/core";
 import { EmaRTIndicator } from "$averages/EmaRTIndicator";
 import { SmaRTIndicator } from "$averages/SmaRTIndicator";
+import { WmaIncrementalRTIndicator } from "$averages/WmaIncrementalRTIndicator";
+import { TemaRTIndicator } from "$averages/TemaRTIndicator";
+import { HmaRTIndicator } from "$averages/HmaRTIndicator";
+import { MmaRTIndicator } from "$averages/MmaRTIndicator";
+import { KamaRTIndicator } from "$averages/KamaRTIndicator";
+import { AtrRTIndicator } from "$indicators/AtrRTIndicator";
+import { StandardDeviationRTIndicator } from "$statistics/StandardDeviationRTIndicator";
+import { VarianceRTIndicator } from "$statistics/VarianceRTIndicator";
+import { VolatilityRTIndicator } from "$helpers/VolatilityRTIndicator";
+import { PercentVolatilityRTIndicator } from "$helpers/PercentVolatilityRTIndicator";
+import { BollingerPercentBRTIndicator } from "$bollinger/BollingerPercentBRTIndicator";
+import type { IndicatorNotice } from "$core/IndicatorNotice";
 import { RsiRTIndicator } from "$indicators/RsiRTIndicator";
 import { MacdRTIndicator } from "$indicators/MacdRTIndicator";
 import { CciRTIndicator } from "$indicators/CciRTIndicator";
@@ -52,6 +64,17 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
   static readonly PREFIX_CCI = "cci";
   static readonly PREFIX_STOCH_RSI = "stochRsi";
   static readonly PREFIX_BOLLINGER = "blgr";
+  static readonly PREFIX_ATR = "atr";
+  static readonly PREFIX_WMA = "wma";
+  static readonly PREFIX_TEMA = "tema";
+  static readonly PREFIX_HMA = "hma";
+  static readonly PREFIX_MMA = "mma";
+  static readonly PREFIX_KAMA = "kama";
+  static readonly PREFIX_STD_DEV = "stdDev";
+  static readonly PREFIX_VARIANCE = "variance";
+  static readonly PREFIX_VOLATILITY = "vol";
+  static readonly PREFIX_PERCENT_VOLATILITY = "pvol";
+  static readonly PREFIX_PERCENT_B = "pctB";
   static readonly PREFIX_GAIN = "_gain";
   static readonly PREFIX_LOSS = "_loss";
   static readonly PREFIX_WINDOW = "_win";
@@ -253,6 +276,199 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
         .withMeta(IndicatorMeta.ID, BollingerBandWidthRTIndicator.ID)
         .withMeta(IndicatorMeta.SOURCE, bollingerIndicatorName)
         .withDisplayHint(DisplayHint.PERCENT),
+    );
+  }
+
+  /**
+   * Average True Range over 14 periods, registered as `atr14`. It reads whole bars (high, low,
+   * close), so it belongs on a kline group: on a ticker those are the exchange's 24-hour
+   * statistics, and the group raises a notice for it (see {@link getNotices}).
+   */
+  atr(): this;
+  atr(periods: number): this;
+  atr(name: string, periods: number): this;
+  atr(nameOrPeriods?: string | number, periods?: number): this {
+    if (nameOrPeriods === undefined) {
+      return this.atr(14);
+    }
+    if (typeof nameOrPeriods === "number") {
+      return this.atr(InstrumentGroupRTIndicator.PREFIX_ATR + nameOrPeriods, nameOrPeriods);
+    }
+    return this.add(nameOrPeriods, new AtrRTIndicator(periods!).withMeta("periods", periods));
+  }
+
+  /** Weighted moving average over `periods`, registered as `wma` + periods; the O(1) form. */
+  wma(periods: number): this;
+  wma(name: string, periods: number): this;
+  wma(nameOrPeriods: string | number, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.wma(InstrumentGroupRTIndicator.PREFIX_WMA + nameOrPeriods, nameOrPeriods);
+    }
+    return this.add(nameOrPeriods, new WmaIncrementalRTIndicator(periods!).withMeta("periods", periods));
+  }
+
+  /** Triple exponential moving average over `periods`, registered as `tema` + periods. */
+  tema(periods: number): this;
+  tema(name: string, periods: number): this;
+  tema(nameOrPeriods: string | number, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.tema(InstrumentGroupRTIndicator.PREFIX_TEMA + nameOrPeriods, nameOrPeriods);
+    }
+    return this.add(nameOrPeriods, new TemaRTIndicator(periods!).withMeta("periods", periods));
+  }
+
+  /** Hull moving average over `periods`, registered as `hma` + periods. */
+  hma(periods: number): this;
+  hma(name: string, periods: number): this;
+  hma(nameOrPeriods: string | number, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.hma(InstrumentGroupRTIndicator.PREFIX_HMA + nameOrPeriods, nameOrPeriods);
+    }
+    return this.add(nameOrPeriods, new HmaRTIndicator(periods!).withMeta("periods", periods));
+  }
+
+  /** Modified moving average over `periods`, registered as `mma` + periods. */
+  mma(periods: number): this;
+  mma(name: string, periods: number): this;
+  /** Modified moving average of another registered indicator. */
+  mma(name: string, indicator: string, periods: number): this;
+  mma(nameOrPeriods: string | number, periodsOrIndicator?: number | string, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.mma(InstrumentGroupRTIndicator.PREFIX_MMA + nameOrPeriods, nameOrPeriods);
+    }
+    if (typeof periodsOrIndicator === "string") {
+      return this.decorate(nameOrPeriods, periodsOrIndicator, (source) =>
+        new MmaRTIndicator(periods!, source)
+          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
+      );
+    }
+    return this.add(nameOrPeriods, new MmaRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator));
+  }
+
+  /**
+   * Kaufman adaptive moving average with its usual periods (efficiency ratio 10, fast 2, slow 30),
+   * registered as `kama10_2_30`.
+   */
+  kama(): this;
+  kama(erPeriod: number, fastPeriod: number, slowPeriod: number): this;
+  kama(name: string, erPeriod: number, fastPeriod: number, slowPeriod: number): this;
+  kama(...args: [] | [number, number, number] | [string, number, number, number]): this {
+    if (args.length === 0) {
+      return this.kama(10, 2, 30);
+    }
+    if (typeof args[0] === "number") {
+      const [er, fast, slow] = args as [number, number, number];
+      return this.kama(InstrumentGroupRTIndicator.PREFIX_KAMA + er + "_" + fast + "_" + slow, er, fast, slow);
+    }
+    const [name, er, fast, slow] = args as [string, number, number, number];
+    return this.add(
+      name,
+      new KamaRTIndicator(er, fast, slow)
+        .withMeta("erPeriod", er)
+        .withMeta("fastPeriod", fast)
+        .withMeta("slowPeriod", slow),
+    );
+  }
+
+  /** Standard deviation over `periods`, registered as `stdDev` + periods. */
+  stdDev(periods: number): this;
+  stdDev(name: string, periods: number): this;
+  /** Standard deviation of another registered indicator. */
+  stdDev(name: string, indicator: string, periods: number): this;
+  stdDev(nameOrPeriods: string | number, periodsOrIndicator?: number | string, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.stdDev(InstrumentGroupRTIndicator.PREFIX_STD_DEV + nameOrPeriods, nameOrPeriods);
+    }
+    if (typeof periodsOrIndicator === "string") {
+      return this.decorate(nameOrPeriods, periodsOrIndicator, (source) =>
+        new StandardDeviationRTIndicator(source, periods!)
+          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
+      );
+    }
+    return this.add(
+      nameOrPeriods,
+      new StandardDeviationRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator),
+    );
+  }
+
+  /** Variance over `periods`, registered as `variance` + periods. */
+  variance(periods: number): this;
+  variance(name: string, periods: number): this;
+  /** Variance of another registered indicator. */
+  variance(name: string, indicator: string, periods: number): this;
+  variance(nameOrPeriods: string | number, periodsOrIndicator?: number | string, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.variance(InstrumentGroupRTIndicator.PREFIX_VARIANCE + nameOrPeriods, nameOrPeriods);
+    }
+    if (typeof periodsOrIndicator === "string") {
+      return this.decorate(nameOrPeriods, periodsOrIndicator, (source) =>
+        new VarianceRTIndicator(source, periods!)
+          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
+      );
+    }
+    return this.add(nameOrPeriods, new VarianceRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator));
+  }
+
+  /**
+   * How often the price changes, averaged over `periods` updates by a simple moving average;
+   * registered as `vol` + periods.
+   */
+  volatility(periods: number): this;
+  volatility(name: string, periods: number): this;
+  volatility(nameOrPeriods: string | number, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.volatility(InstrumentGroupRTIndicator.PREFIX_VOLATILITY + nameOrPeriods, nameOrPeriods);
+    }
+    return this.add(
+      nameOrPeriods,
+      new VolatilityRTIndicator(new SmaRTIndicator(periods!)).withMeta("periods", periods),
+    );
+  }
+
+  /**
+   * The average absolute percent change between updates, over `periods` updates; registered as
+   * `pvol` + periods.
+   */
+  percentVolatility(periods: number): this;
+  percentVolatility(name: string, periods: number): this;
+  percentVolatility(nameOrPeriods: string | number, periods?: number): this {
+    if (typeof nameOrPeriods === "number") {
+      return this.percentVolatility(InstrumentGroupRTIndicator.PREFIX_PERCENT_VOLATILITY + nameOrPeriods, nameOrPeriods);
+    }
+    return this.add(
+      nameOrPeriods,
+      new PercentVolatilityRTIndicator(new SmaRTIndicator(periods!)).withMeta("periods", periods),
+    );
+  }
+
+  /**
+   * Bollinger %B over 20 periods and a multiplier of 2: where the price sits in the bands. It
+   * carries bands of its own; it does not read or update a Bollinger of the group.
+   */
+  bollingerPercentB(): this;
+  bollingerPercentB(periods: number): this;
+  bollingerPercentB(periods: number, k: number): this;
+  bollingerPercentB(name: string, periods: number, k: number): this;
+  bollingerPercentB(nameOrPeriods?: string | number, periodsOrK?: number, k?: number): this {
+    if (nameOrPeriods === undefined) {
+      return this.bollingerPercentB(20);
+    }
+    if (typeof nameOrPeriods === "number") {
+      const kVal = periodsOrK ?? 2;
+      return this.bollingerPercentB(
+        InstrumentGroupRTIndicator.PREFIX_PERCENT_B + nameOrPeriods + "_" + kVal,
+        nameOrPeriods,
+        kVal,
+      );
+    }
+    return this.add(
+      nameOrPeriods,
+      new BollingerPercentBRTIndicator(new BollingerBandsRTIndicator(periodsOrK!, k!))
+        .withMeta("periods", periodsOrK)
+        .withMeta("k", k),
     );
   }
 
@@ -473,6 +689,14 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
         this.indicators.getReadOnlyExisting(indicatorBOrCoeff),
       ),
     );
+  }
+
+  /**
+   * Wiring diagnostics raised about this group, in the order they were first raised; empty for a
+   * correctly wired group. Today the one kind is an indicator that needs bars, fed from a ticker.
+   */
+  getNotices(): IndicatorNotice[] {
+    return this.indicators.getNotices();
   }
 
   /**

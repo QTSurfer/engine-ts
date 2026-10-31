@@ -1,4 +1,6 @@
 import { AbstractRTIndicator } from "$core/AbstractRTIndicator";
+import type { IndicatorNotice } from "$core/IndicatorNotice";
+import { noticeKey } from "$core/IndicatorNotice";
 import type { RTIndicator } from "$core/RTIndicator";
 import { ReadOnlyRTIndicator } from "$numeric/ReadOnlyRTIndicator";
 
@@ -13,6 +15,7 @@ export class InstrumentMapRTIndicator extends AbstractRTIndicator {
   private readonly indicators = new Map<string, RTIndicator>();
   private readonly readOnlyCache = new Map<string, RTIndicator>();
   private backtestEnabled = false;
+  private readonly notices = new Map<string, IndicatorNotice>();
 
   constructor(instrument: string) {
     super();
@@ -83,6 +86,31 @@ export class InstrumentMapRTIndicator extends AbstractRTIndicator {
   clear(): void {
     this.indicators.clear();
     this.readOnlyCache.clear();
+    this.notices.clear();
+  }
+
+  /**
+   * Wiring diagnostics raised about this map, in the order they were first raised; empty for a
+   * correctly wired one.
+   */
+  getNotices(): IndicatorNotice[] {
+    return [...this.notices.values()];
+  }
+
+  /**
+   * Records a notice, keeping only the first occurrence per (code, indicator) pair: the conditions
+   * worth reporting are detected inside the per-update dispatch loop, so the same one would
+   * otherwise be raised on every update.
+   *
+   * @returns true if this was the first time that notice was raised
+   */
+  protected raiseNotice(notice: IndicatorNotice): boolean {
+    const key = noticeKey(notice);
+    if (this.notices.has(key)) {
+      return false;
+    }
+    this.notices.set(key, notice);
+    return true;
   }
 
   /**
@@ -131,5 +159,10 @@ export class InstrumentMapRTIndicator extends AbstractRTIndicator {
 
   protected indicatorValues(): IterableIterator<RTIndicator> {
     return this.indicators.values();
+  }
+
+  /** Every registered indicator with the name it was registered under, hidden ones included. */
+  protected namedIndicators(): IterableIterator<[string, RTIndicator]> {
+    return this.indicators.entries();
   }
 }

@@ -1,4 +1,5 @@
-import type { RTIndicatorSource } from "$core/RTIndicator";
+import { barDataOnTickerPath } from "$core/IndicatorNotice";
+import type { RichRTIndicator, RTIndicatorSource } from "$core/RTIndicator";
 import type { Ticker } from "@qtsurfer/core";
 import { TickerValueSource, getTickerValue } from "@qtsurfer/core";
 import { InstrumentMapRTIndicator } from "./InstrumentMapRTIndicator";
@@ -25,9 +26,15 @@ export class InstrumentMapTickerSourceRTIndicator
     if (this.isBacktestEnabled()) {
       this.setClockFn(() => source.timestamp);
     }
-    for (const indicator of this.indicatorValues()) {
+    for (const [name, indicator] of this.namedIndicators()) {
       // Check if the indicator itself can handle ticker updates
       if (hasUpdateFrom(indicator)) {
+        // On the ticker path high, low and volume are the exchange's 24h statistics, not a bar's:
+        // an indicator that needs bars is reported once, and still updated (its values are
+        // misleading, not invalid).
+        if ((indicator as RichRTIndicator<Ticker>).requiresBarData?.() === true) {
+          this.raiseNotice(barDataOnTickerPath(name, this.instrument));
+        }
         indicator.updateFrom(source);
       } else {
         const value = getTickerValue(source, this.valueSource);

@@ -1,16 +1,16 @@
 import type { Kline, Ticker } from "@qtsurfer/core";
 import { AbstractRTIndicator } from "$core/AbstractRTIndicator";
-import type { RTIndicatorSource } from "$core/RTIndicator";
+import type { RichRTIndicator } from "$core/RTIndicator";
 
 /**
  * Average True Range (ATR) with O(1) per-tick Wilder's smoothing.
- * Port of com.wualabs.qtsurfer.engine.indicators.pro.AtrRTIndicator
+ * Port of com.wualabs.qtsurfer.engine.indicators.volatility.AtrRTIndicator
  *
  * In a group it reads each bar's high, low and close through {@link updateFrom}, so it belongs on a
  * kline group: on a ticker the high and low are the exchange's 24-hour statistics, and the value
  * stops meaning what its name says.
  */
-export class AtrRTIndicator extends AbstractRTIndicator implements RTIndicatorSource<Kline | Ticker> {
+export class AtrRTIndicator extends AbstractRTIndicator implements RichRTIndicator<Kline | Ticker> {
   private readonly _periods: number;
   private prevClose = 0;
   private atrValue = 0;
@@ -24,6 +24,11 @@ export class AtrRTIndicator extends AbstractRTIndicator implements RTIndicatorSo
 
   get periods(): number {
     return this._periods;
+  }
+
+  /** It reads each bar's high, low and close: a group fed from a ticker raises a notice for it. */
+  requiresBarData(): boolean {
+    return true;
   }
 
   override isReady(): boolean {
