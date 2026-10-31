@@ -1,5 +1,13 @@
 # @qtsurfer/strategy
 
+## 0.14.0
+
+### Patch Changes
+
+- Updated dependencies [[`67c092e`](https://github.com/QTSurfer/engine-ts/commit/67c092e3217c1d5ad0ab7301957e25e781b61c8f)]:
+  - @qtsurfer/indicators@0.14.0
+  - @qtsurfer/core@0.14.0
+
 ## 0.13.0
 
 ### Minor Changes
