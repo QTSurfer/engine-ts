@@ -1,6 +1,6 @@
 {
   "name": "@qtsurfer/core",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "type": "module",
   "description": "QTSurfer Core — shared types and data structures",
   "license": "AGPL-3.0-only OR LicenseRef-Wualabs-Commercial",
