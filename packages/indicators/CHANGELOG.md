@@ -1,5 +1,20 @@
 # @qtsurfer/indicators
 
+## 0.15.0
+
+### Minor Changes
+
+- [#4](https://github.com/QTSurfer/engine-ts/pull/4) [`7abf262`](https://github.com/QTSurfer/engine-ts/commit/7abf262d7daad2a03f1a6cb1536badf37286e916) Thanks [@mrmx](https://github.com/mrmx)! - `stochRsi(periods)` and `stochRsi(name, periods)` on the group builder now use Wilder's RSI averages, as their name says.
+  The previous default, discrete simple averages, held each RSI value for a whole block of `periods` updates, so the
+  stochastic collapsed to 0 and 100 on real series. Behaviour change for strategies that use `stochRsi` without the new flag.
+  Two overloads, `stochRsi(periods, sma)` and `stochRsi(name, periods, sma)`, pick the averages explicitly: `true` gives the
+  previous behaviour. The `StochasticRsiRTIndicator` constructors are unchanged.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @qtsurfer/core@0.15.0
+
 ## 0.14.0
 
 ### Minor Changes
