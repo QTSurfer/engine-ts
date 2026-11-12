@@ -216,16 +216,26 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     return this.add(nameOrPeriods, new CciRTIndicator(periods!).withMeta("periods", periods));
   }
 
-  /** Stochastic RSI over `periods`, registered as `stochRsi` + periods. Its output is [0, 100]. */
+  /**
+   * Stochastic RSI over `periods`, registered as `stochRsi` + periods, with Wilder's RSI averages. Its output is [0, 100].
+   * `sma` picks the averages instead: `true` for the discrete simple averages, which hold each value for a whole block of
+   * `periods` updates and collapse the stochastic to 0 and 100 on real series.
+   */
   stochRsi(periods: number): this;
+  stochRsi(periods: number, sma: boolean): this;
   stochRsi(name: string, periods: number): this;
-  stochRsi(nameOrPeriods: string | number, periods?: number): this {
+  stochRsi(name: string, periods: number, sma: boolean): this;
+  stochRsi(nameOrPeriods: string | number, periodsOrSma?: number | boolean, sma?: boolean): this {
     if (typeof nameOrPeriods === "number") {
-      return this.stochRsi(InstrumentGroupRTIndicator.PREFIX_STOCH_RSI + nameOrPeriods, nameOrPeriods);
+      const useSma = typeof periodsOrSma === "boolean" ? periodsOrSma : false;
+      return this.stochRsi(InstrumentGroupRTIndicator.PREFIX_STOCH_RSI + nameOrPeriods, nameOrPeriods, useSma);
     }
+    const periods = periodsOrSma as number;
     return this.add(
       nameOrPeriods,
-      new StochasticRsiRTIndicator(periods!).withMeta("periods", periods).withDisplayHint(DisplayHint.PERCENT),
+      new StochasticRsiRTIndicator(periods, null, sma ?? false)
+        .withMeta("periods", periods)
+        .withDisplayHint(DisplayHint.PERCENT),
     );
   }
 

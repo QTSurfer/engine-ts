@@ -227,6 +227,38 @@ describe("cci", () => {
     close(series(group, "cci3", [10, 20, 60, 100]), [0, 200 / 3, 100, 100]);
   });
 
+  it("uses Wilder's RSI averages by default, and the discrete ones only with the flag", () => {
+    // A random walk of 400 closes, step 1 from 100: the same shape of series as the Java builder's test, not the same
+    // numbers. The discrete averages collapse the stochastic to 0 and 100; Wilder's do not.
+    let state = 42;
+    const next = () => ((state = (state * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const closes: number[] = [];
+    let price = 100;
+    for (let i = 0; i < 400; i++) {
+      const u1 = Math.max(next(), 1e-12);
+      const u2 = next();
+      price += Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      closes.push(price);
+    }
+    const byDefault = series(priceGroup().stochRsi(14), "stochRsi14", closes);
+    const explicitWilder = series(priceGroup().stochRsi(14, false), "stochRsi14", closes);
+    const withSma = series(priceGroup().stochRsi(14, true), "stochRsi14", closes);
+    expect(byDefault).toEqual(explicitWilder);
+    const tail = (values: number[]) => values.slice(100);
+    expect(tail(withSma).every((v) => Math.abs(v) < 1e-9 || Math.abs(v - 100) < 1e-9)).toBe(true);
+    expect(tail(byDefault).some((v) => Math.abs(v) > 1e-9 && Math.abs(v - 100) > 1e-9)).toBe(true);
+  });
+
+  it("takes the named overloads with the same flag", () => {
+    const closes = [10, 12, 11, 13, 14, 13, 15, 12, 16, 14, 13, 17];
+    expect(series(priceGroup().stochRsi("mine", 3, true), "mine", closes)).toEqual(
+      series(priceGroup().stochRsi(3, true), "stochRsi3", closes),
+    );
+    expect(series(priceGroup().stochRsi("mine", 3), "mine", closes)).toEqual(
+      series(priceGroup().stochRsi("mine", 3, false), "mine", closes),
+    );
+  });
+
   it("takes the same values through the positional and the named form", () => {
     const prices = [10, 20, 60, 100, 30];
     expect(series(priceGroup().cci(3), "cci3", prices)).toEqual(series(priceGroup().cci("cci3", 3), "cci3", prices));
@@ -252,7 +284,8 @@ describe("stochRsi", () => {
     // Cutler RSI(3) over 10, 12, 11, 13, 14, 13 is 0, 0, 66.67, 66.67, 66.67, 75 (averages move
     // at ticks 3 and 6). StochRSI = 100 * (rsi - min) / (max - min) over the last 3 RSI values:
     //   [0] 0   [0, 0] 0   [0, 0, 66.67] 100   [0, 66.67, 66.67] 100   [66.67 x3] 0   [66.67, 66.67, 75] 100
-    const group = priceGroup().stochRsi(3);
+    // The discrete averages (the flag): the default is Wilder's now, see below
+    const group = priceGroup().stochRsi(3, true);
     expect(series(group, "stochRsi3", [10, 12, 11, 13, 14, 13])).toEqual([0, 0, 100, 100, 0, 100]);
   });
 
