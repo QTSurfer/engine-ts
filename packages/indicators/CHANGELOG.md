@@ -1,5 +1,20 @@
 # @qtsurfer/indicators
 
+## 0.16.0
+
+### Minor Changes
+
+- [#6](https://github.com/QTSurfer/engine-ts/pull/6) [`dc30200`](https://github.com/QTSurfer/engine-ts/commit/dc3020010ec49670b6ec6da3d21189d9ee5de57f) Thanks [@mrmx](https://github.com/mrmx)! - The free indicators of the builder describe how a chart should draw them, with the same keys as the Java engine. `IndicatorMeta` gains placement (`plc`, drawn over the price), range (`rng`), floor (`flo`), levels (`lvl`), plot style (`sty`), side (`sde`) and drawn-by-default (`drw`), with typed accessors (`isOverlay`, `getRange`, `getFloor`, `getLevels`, `getPlotStyle`, `getPlotSide`, `isDrawnByDefault` and their setters), and constants for the keys of the parameters (`IndicatorMeta.PERIODS`, `K`, `BAND`, `OUTPUT`...). `PlotStyle` and `PlotSide` are new, `DisplayHint` gains `FRACTION` (`F`), `RATIO` (`R`), `INDEX` (`I`) and `NUMBER` (`N`), and `withMeta` accepts a function that edits the metadata.
+
+  Averages (`sma`, `ema`, `wma`, `tema`, `hma`, `mma`, `kama`) and the Bollinger bands are drawn over the price; `cci` and `macd` carry a zero line; `rsi` and `stochRsi` have a 0 to 100 scale; `cci` and `variance` read as pure numbers, `bollingerPercentB` as a ratio, `volatility` and `percentVolatility` as percentages. An average or MACD of another indicator keeps no placement, and a MACD keeps its zero line. No value changes; the unit of `rsi` and `stochRsi` stays a percentage.
+
+### Patch Changes
+
+- [#6](https://github.com/QTSurfer/engine-ts/pull/6) [`f81518f`](https://github.com/QTSurfer/engine-ts/commit/f81518fff27ab53c3bfa90bf2a703e19e0c84138) Thanks [@mrmx](https://github.com/mrmx)! - A read-only view describes the indicator it wraps: the function form of `withMeta` reaches the wrapped indicator, like the key form and `withDisplayHint` already did. `hide()` on a view marks the view only, never the indicator it wraps, and the view reads as hidden. A view registered under an internal name (`_...`) is registered as a view of its own, so hiding that alias no longer hides the same view when it is held by another entry or handed out again by `getReadOnly`.
+
+- Updated dependencies []:
+  - @qtsurfer/core@0.16.0
+
 ## 0.15.0
 
 ### Minor Changes
