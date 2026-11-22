@@ -2,6 +2,8 @@ export type { RTIndicator, RTIndicatorSource, RichRTIndicator } from "./RTIndica
 export { BAR_DATA_ON_TICKER_PATH, barDataOnTickerPath, noticeKey } from "./IndicatorNotice";
 export type { IndicatorNotice } from "./IndicatorNotice";
 export { DisplayHint } from "./DisplayHint";
+export { PlotSide } from "./PlotSide";
+export { PlotStyle } from "./PlotStyle";
 export { Duration } from "./Duration";
 export { IndicatorMeta } from "./IndicatorMeta";
 export { AbstractRTIndicator } from "./AbstractRTIndicator";

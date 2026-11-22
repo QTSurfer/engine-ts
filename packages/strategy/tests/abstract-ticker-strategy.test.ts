@@ -162,6 +162,43 @@ describe("AbstractTickerStrategy", () => {
     expect(result).toBeDefined();
   });
 
+  it("getGlobalStateStore is one store, the same object on every call", () => {
+    setUp();
+    const first = strategy.getGlobalStateStore();
+    expect(first).toBeDefined();
+    expect(strategy.getGlobalStateStore()).toBe(first);
+    // Still the same one after instrument stores came and went
+    strategy.getStateStore(INSTRUMENT);
+    strategy.getStateStore("OTHER/INSTRUMENT");
+    expect(strategy.getGlobalStateStore()).toBe(first);
+  });
+
+  it("the global store is a namespace of its own, apart from every instrument's store", () => {
+    setUp();
+    const global = strategy.getGlobalStateStore();
+    const store = strategy.getStateStore(INSTRUMENT);
+    const other = strategy.getStateStore("OTHER/INSTRUMENT");
+    expect(global).not.toBe(store);
+    expect(global).not.toBe(other);
+
+    global.setState("key", "global");
+    expect(store.getState("key")).toBeUndefined();
+    expect(other.getState("key")).toBeUndefined();
+
+    store.setState("only-instrument", 1);
+    other.setState("key", "other");
+    expect(global.getState("only-instrument")).toBeUndefined();
+    expect(global.getState("key")).toBe("global");
+    expect(store.getState("key")).toBeUndefined();
+  });
+
+  it("a window of an instrument's group still uses that instrument's store, not the global one", () => {
+    setUp();
+    const group = strategy.getInstrumentIndicatorGroup(INSTRUMENT);
+    expect(group.getStateStore()).toBe(strategy.getStateStore(INSTRUMENT));
+    expect(group.getStateStore()).not.toBe(strategy.getGlobalStateStore());
+  });
+
   it("getInstrumentIndicatorGroup creates group", () => {
     setUp();
     const result = strategy.getInstrumentIndicatorGroup(INSTRUMENT);

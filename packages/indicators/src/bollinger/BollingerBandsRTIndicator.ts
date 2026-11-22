@@ -69,11 +69,17 @@ export class BollingerBandsRTIndicator extends AbstractRTIndicator {
   }
 
   private describeBand(indicator: AbstractRTIndicator, periods: number, k: number, band: string): void {
+    // The three bands are drawn over the price. The middle one is told so before its band, the edges after, as in Java.
+    const overThePrice = (meta: IndicatorMeta) => meta.setOverlay(true);
     indicator
       .withMeta(IndicatorMeta.ID, BollingerBandsRTIndicator.ID)
-      .withMeta("periods", periods)
-      .withMeta("k", k)
-      .withMeta("band", band);
+      .withMeta(IndicatorMeta.PERIODS, periods)
+      .withMeta(IndicatorMeta.K, k);
+    if (band === "middle") {
+      indicator.withMeta(overThePrice).withMeta(IndicatorMeta.BAND, band);
+    } else {
+      indicator.withMeta(IndicatorMeta.BAND, band).withMeta(overThePrice);
+    }
   }
 
   override isReady(): boolean {

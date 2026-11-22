@@ -93,6 +93,24 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
   /** Name suffix of a bandwidth entry: the key of the band it derives from, plus this. */
   static readonly SUBFIX_BANDWIDTH = "BW";
 
+  // What a chart needs to draw the free indicators (the web table, one row each): the factories below
+  // apply these to the indicators that read the price by default.
+
+  /** Drawn over the price, as an average of it is. */
+  private static readonly OVER_THE_PRICE = (meta: IndicatorMeta): void => {
+    meta.setOverlay(true);
+  };
+
+  /** An oscillator around zero. */
+  private static readonly AROUND_ZERO = (meta: IndicatorMeta): void => {
+    meta.setLevels(0);
+  };
+
+  /** An index that stays between 0 and 100. */
+  private static readonly ZERO_TO_HUNDRED = (meta: IndicatorMeta): void => {
+    meta.setRange(0, 100);
+  };
+
   readonly instrument: string;
   readonly indicators: InstrumentMapRTIndicator;
   private windowCount = 0;
@@ -133,14 +151,17 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
       return this.add(
         nameOrPeriods,
         new SmaRTIndicator(periods, this.indicators.getReadOnlyExisting(periodsOrIndicator))
-          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.PERIODS, periods)
           .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
       );
     }
     const discreteMode = (discreteModeOrPeriods as boolean | undefined) ?? true;
     return this.add(
       nameOrPeriods,
-      new SmaRTIndicator(periodsOrIndicator!).withDiscreteMode(discreteMode).withMeta("periods", periodsOrIndicator),
+      new SmaRTIndicator(periodsOrIndicator!)
+        .withDiscreteMode(discreteMode)
+        .withMeta(IndicatorMeta.PERIODS, periodsOrIndicator)
+        .withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
     );
   }
 
@@ -155,11 +176,16 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
       return this.add(
         nameOrPeriods,
         new EmaRTIndicator(periods!, this.indicators.getReadOnlyExisting(periodsOrIndicator))
-          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.PERIODS, periods)
           .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
       );
     }
-    return this.add(nameOrPeriods, new EmaRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator));
+    return this.add(
+      nameOrPeriods,
+      new EmaRTIndicator(periodsOrIndicator!)
+        .withMeta(IndicatorMeta.PERIODS, periodsOrIndicator)
+        .withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
+    );
   }
 
   rsi(periods: number): this;
@@ -173,7 +199,8 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     return this.add(
       nameOrPeriods,
       new RsiRTIndicator(periodsOrSma as number, sma!)
-        .withMeta("periods", periodsOrSma)
+        .withMeta(IndicatorMeta.PERIODS, periodsOrSma)
+        .withMeta(InstrumentGroupRTIndicator.ZERO_TO_HUNDRED)
         .withDisplayHint(DisplayHint.PERCENT),
     );
   }
@@ -192,17 +219,19 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
       const [indicator, shortPeriods, longPeriods] = args as [string, number, number];
       return this.decorate(name, indicator, (source) =>
         new MacdRTIndicator(source, shortPeriods, longPeriods)
-          .withMeta("shortPeriods", shortPeriods)
-          .withMeta("longPeriods", longPeriods)
-          .withMeta(IndicatorMeta.SOURCE, indicator),
+          .withMeta(IndicatorMeta.SHORT_PERIODS, shortPeriods)
+          .withMeta(IndicatorMeta.LONG_PERIODS, longPeriods)
+          .withMeta(IndicatorMeta.SOURCE, indicator)
+          .withMeta(InstrumentGroupRTIndicator.AROUND_ZERO),
       );
     }
     const [shortPeriods = 12, longPeriods = 26] = args as [number?, number?];
     return this.add(
       name,
       new MacdRTIndicator(null, shortPeriods, longPeriods)
-        .withMeta("shortPeriods", shortPeriods)
-        .withMeta("longPeriods", longPeriods),
+        .withMeta(IndicatorMeta.SHORT_PERIODS, shortPeriods)
+        .withMeta(IndicatorMeta.LONG_PERIODS, longPeriods)
+        .withMeta(InstrumentGroupRTIndicator.AROUND_ZERO),
     );
   }
 
@@ -213,7 +242,13 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof nameOrPeriods === "number") {
       return this.cci(InstrumentGroupRTIndicator.PREFIX_CCI + nameOrPeriods, nameOrPeriods);
     }
-    return this.add(nameOrPeriods, new CciRTIndicator(periods!).withMeta("periods", periods));
+    return this.add(
+      nameOrPeriods,
+      new CciRTIndicator(periods!)
+        .withMeta(IndicatorMeta.PERIODS, periods)
+        .withMeta(InstrumentGroupRTIndicator.AROUND_ZERO)
+        .withDisplayHint(DisplayHint.NUMBER),
+    );
   }
 
   /**
@@ -234,7 +269,8 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     return this.add(
       nameOrPeriods,
       new StochasticRsiRTIndicator(periods, null, sma ?? false)
-        .withMeta("periods", periods)
+        .withMeta(IndicatorMeta.PERIODS, periods)
+        .withMeta(InstrumentGroupRTIndicator.ZERO_TO_HUNDRED)
         .withDisplayHint(DisplayHint.PERCENT),
     );
   }
@@ -304,7 +340,7 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof nameOrPeriods === "number") {
       return this.atr(InstrumentGroupRTIndicator.PREFIX_ATR + nameOrPeriods, nameOrPeriods);
     }
-    return this.add(nameOrPeriods, new AtrRTIndicator(periods!).withMeta("periods", periods));
+    return this.add(nameOrPeriods, new AtrRTIndicator(periods!).withMeta(IndicatorMeta.PERIODS, periods));
   }
 
   /** Weighted moving average over `periods`, registered as `wma` + periods; the O(1) form. */
@@ -314,7 +350,10 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof nameOrPeriods === "number") {
       return this.wma(InstrumentGroupRTIndicator.PREFIX_WMA + nameOrPeriods, nameOrPeriods);
     }
-    return this.add(nameOrPeriods, new WmaIncrementalRTIndicator(periods!).withMeta("periods", periods));
+    return this.add(
+      nameOrPeriods,
+      new WmaIncrementalRTIndicator(periods!).withMeta(IndicatorMeta.PERIODS, periods).withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
+    );
   }
 
   /** Triple exponential moving average over `periods`, registered as `tema` + periods. */
@@ -324,7 +363,10 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof nameOrPeriods === "number") {
       return this.tema(InstrumentGroupRTIndicator.PREFIX_TEMA + nameOrPeriods, nameOrPeriods);
     }
-    return this.add(nameOrPeriods, new TemaRTIndicator(periods!).withMeta("periods", periods));
+    return this.add(
+      nameOrPeriods,
+      new TemaRTIndicator(periods!).withMeta(IndicatorMeta.PERIODS, periods).withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
+    );
   }
 
   /** Hull moving average over `periods`, registered as `hma` + periods. */
@@ -334,7 +376,10 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof nameOrPeriods === "number") {
       return this.hma(InstrumentGroupRTIndicator.PREFIX_HMA + nameOrPeriods, nameOrPeriods);
     }
-    return this.add(nameOrPeriods, new HmaRTIndicator(periods!).withMeta("periods", periods));
+    return this.add(
+      nameOrPeriods,
+      new HmaRTIndicator(periods!).withMeta(IndicatorMeta.PERIODS, periods).withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
+    );
   }
 
   /** Modified moving average over `periods`, registered as `mma` + periods. */
@@ -349,11 +394,16 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof periodsOrIndicator === "string") {
       return this.decorate(nameOrPeriods, periodsOrIndicator, (source) =>
         new MmaRTIndicator(periods!, source)
-          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.PERIODS, periods)
           .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
       );
     }
-    return this.add(nameOrPeriods, new MmaRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator));
+    return this.add(
+      nameOrPeriods,
+      new MmaRTIndicator(periodsOrIndicator!)
+        .withMeta(IndicatorMeta.PERIODS, periodsOrIndicator)
+        .withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
+    );
   }
 
   /**
@@ -375,9 +425,10 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     return this.add(
       name,
       new KamaRTIndicator(er, fast, slow)
-        .withMeta("erPeriod", er)
-        .withMeta("fastPeriod", fast)
-        .withMeta("slowPeriod", slow),
+        .withMeta(IndicatorMeta.ER_PERIOD, er)
+        .withMeta(IndicatorMeta.FAST_PERIOD, fast)
+        .withMeta(IndicatorMeta.SLOW_PERIOD, slow)
+        .withMeta(InstrumentGroupRTIndicator.OVER_THE_PRICE),
     );
   }
 
@@ -393,13 +444,13 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof periodsOrIndicator === "string") {
       return this.decorate(nameOrPeriods, periodsOrIndicator, (source) =>
         new StandardDeviationRTIndicator(source, periods!)
-          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.PERIODS, periods)
           .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
       );
     }
     return this.add(
       nameOrPeriods,
-      new StandardDeviationRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator),
+      new StandardDeviationRTIndicator(periodsOrIndicator!).withMeta(IndicatorMeta.PERIODS, periodsOrIndicator),
     );
   }
 
@@ -415,11 +466,16 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     if (typeof periodsOrIndicator === "string") {
       return this.decorate(nameOrPeriods, periodsOrIndicator, (source) =>
         new VarianceRTIndicator(source, periods!)
-          .withMeta("periods", periods)
+          .withMeta(IndicatorMeta.PERIODS, periods)
           .withMeta(IndicatorMeta.SOURCE, periodsOrIndicator),
       );
     }
-    return this.add(nameOrPeriods, new VarianceRTIndicator(periodsOrIndicator!).withMeta("periods", periodsOrIndicator));
+    return this.add(
+      nameOrPeriods,
+      new VarianceRTIndicator(periodsOrIndicator!)
+        .withMeta(IndicatorMeta.PERIODS, periodsOrIndicator)
+        .withDisplayHint(DisplayHint.NUMBER),
+    );
   }
 
   /**
@@ -434,7 +490,9 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     }
     return this.add(
       nameOrPeriods,
-      new VolatilityRTIndicator(new SmaRTIndicator(periods!)).withMeta("periods", periods),
+      new VolatilityRTIndicator(new SmaRTIndicator(periods!))
+        .withMeta(IndicatorMeta.PERIODS, periods)
+        .withDisplayHint(DisplayHint.PERCENT),
     );
   }
 
@@ -450,7 +508,9 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     }
     return this.add(
       nameOrPeriods,
-      new PercentVolatilityRTIndicator(new SmaRTIndicator(periods!)).withMeta("periods", periods),
+      new PercentVolatilityRTIndicator(new SmaRTIndicator(periods!))
+        .withMeta(IndicatorMeta.PERIODS, periods)
+        .withDisplayHint(DisplayHint.PERCENT),
     );
   }
 
@@ -477,8 +537,9 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     return this.add(
       nameOrPeriods,
       new BollingerPercentBRTIndicator(new BollingerBandsRTIndicator(periodsOrK!, k!))
-        .withMeta("periods", periodsOrK)
-        .withMeta("k", k),
+        .withMeta(IndicatorMeta.PERIODS, periodsOrK)
+        .withMeta(IndicatorMeta.K, k)
+        .withDisplayHint(DisplayHint.RATIO),
     );
   }
 

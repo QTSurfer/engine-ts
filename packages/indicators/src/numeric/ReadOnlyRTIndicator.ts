@@ -31,9 +31,15 @@ export class ReadOnlyRTIndicator extends AbstractRTIndicator {
     return this.indicator.getId?.() ?? IndicatorMeta.deriveId(this.indicator.constructor);
   }
 
-  override withMeta(key: string, value: unknown): this {
+  override withMeta(key: string, value: unknown): this;
+  override withMeta(editor: (meta: IndicatorMeta) => void): this;
+  override withMeta(keyOrEditor: string | ((meta: IndicatorMeta) => void), value?: unknown): this {
     if (this.indicator instanceof AbstractRTIndicator) {
-      this.indicator.withMeta(key, value);
+      if (typeof keyOrEditor === "function") {
+        this.indicator.withMeta(keyOrEditor);
+      } else {
+        this.indicator.withMeta(keyOrEditor, value);
+      }
     }
     return this;
   }
@@ -43,6 +49,20 @@ export class ReadOnlyRTIndicator extends AbstractRTIndicator {
       this.indicator.withDisplayHint(displayHint);
     }
     return this;
+  }
+
+  // Hiding belongs to the registered entry, not to the indicator: a view registered under an
+  // internal name is an alias, so hide() marks the view only and never reaches the wrapped
+  // indicator, which may be published under its own name
+  private hiddenView = false;
+
+  override hide(): this {
+    this.hiddenView = true;
+    return this;
+  }
+
+  override isHidden(): boolean {
+    return this.hiddenView || (this.indicator.isHidden?.() ?? false);
   }
 
   override getValue(): number {

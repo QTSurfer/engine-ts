@@ -184,6 +184,43 @@ describe("ReadOnlyRTIndicator metadata", () => {
     expect(view.getMeta().get("periods")).toBe("3");
   });
 
+  it("writes every kind of descriptor edit through to the wrapped indicator", () => {
+    const sma = new SmaRTIndicator(3);
+    const view = new ReadOnlyRTIndicator(sma);
+    expect(view.withMeta("periods", 3)).toBe(view);
+    expect(view.withMeta((meta) => meta.setOverlay(true))).toBe(view);
+    expect(view.withDisplayHint(DisplayHint.PERCENT)).toBe(view);
+    expect(sma.getMeta().get("periods")).toBe("3");
+    expect(sma.getMeta().isOverlay()).toBe(true);
+    expect(sma.getDisplayHint()).toBe(DisplayHint.PERCENT);
+    expect(view.getMeta().isOverlay()).toBe(true);
+  });
+
+  it("hide marks the view only, and a view of a hidden indicator reads as hidden", () => {
+    const sma = new SmaRTIndicator(3);
+    const view = new ReadOnlyRTIndicator(sma);
+    expect(view.isHidden()).toBe(false);
+    expect(view.hide()).toBe(view);
+    expect(view.isHidden()).toBe(true);
+    expect(sma.isHidden()).toBe(false);
+    expect(sma.getMeta().isHidden()).toBe(false);
+
+    const internal = new SmaRTIndicator(3).hide();
+    expect(new ReadOnlyRTIndicator(internal).isHidden()).toBe(true);
+  });
+
+  it("drops a typed edit of a wrapped indicator that cannot carry it", () => {
+    const bare: RTIndicator = {
+      getValue: () => 1,
+      update: (value) => value,
+      isReady: () => true,
+      reset: () => {},
+    };
+    const view = new ReadOnlyRTIndicator(bare);
+    expect(() => view.withMeta((meta) => meta.setOverlay(true))).not.toThrow();
+    expect(view.getMeta().isEmpty()).toBe(true);
+  });
+
   it("reads the descriptor of a wrapped indicator that carries none as empty", () => {
     const bare: RTIndicator = {
       getValue: () => 1,
