@@ -41,8 +41,18 @@ export abstract class AbstractRTIndicator implements RTIndicator {
    * Sets one descriptive entry, so a builder can describe an indicator as it registers it. Metadata
    * is a write-only descriptor: an indicator must never read it back to compute.
    */
-  withMeta(key: string, value: unknown): this {
-    this.writableMeta().set(key, value);
+  withMeta(key: string, value: unknown): this;
+  /**
+   * Describes the indicator through its metadata directly, for the keys that have a typed form
+   * (`setOverlay`, `setRange`...). Like the form with a key, a write-only descriptor.
+   */
+  withMeta(editor: (meta: IndicatorMeta) => void): this;
+  withMeta(keyOrEditor: string | ((meta: IndicatorMeta) => void), value?: unknown): this {
+    if (typeof keyOrEditor === "function") {
+      keyOrEditor(this.writableMeta());
+    } else {
+      this.writableMeta().set(keyOrEditor, value);
+    }
     return this;
   }
 

@@ -210,24 +210,24 @@ describe("display hints", () => {
 });
 
 describe("metadata keys", () => {
-  it("sma and ema record their periods; with a source indicator they record it too", () => {
+  it("sma and ema record their periods and are drawn over the price; with a source indicator they record it too, and are not", () => {
     const group = new InstrumentGroupRTIndicator(INSTRUMENT).addPrice();
     group.sma(20).ema("e", 12).sma("sOfP", "price", 3).ema("eOfP", "price", 5);
-    expect(metaOf(group.get("sma20"))).toEqual({ periods: "20" });
-    expect(metaOf(group.get("e"))).toEqual({ periods: "12" });
+    expect(metaOf(group.get("sma20"))).toEqual({ periods: "20", plc: "o" });
+    expect(metaOf(group.get("e"))).toEqual({ periods: "12", plc: "o" });
     expect(metaOf(group.get("sOfP"))).toEqual({ periods: "3", src: "price" });
     expect(metaOf(group.get("eOfP"))).toEqual({ periods: "5", src: "price" });
   });
 
   it("rsi records its periods and the percent hint", () => {
     const group = new InstrumentGroupRTIndicator(INSTRUMENT).addPrice().rsi(14);
-    expect(metaOf(group.get("rsi14"))).toEqual({ periods: "14", dsp: "P" });
+    expect(metaOf(group.get("rsi14"))).toEqual({ periods: "14", rng: "0:100", dsp: "P" });
     expect(group.getExisting("rsi14").getId!()).toBe("rsi");
   });
 
   it("bollinger describes each band with its id, periods, k and band", () => {
     const group = new InstrumentGroupRTIndicator(INSTRUMENT).addPrice().bollinger(13, 2);
-    const base = { id: "bollinger", periods: "13", k: "2" };
+    const base = { id: "bollinger", periods: "13", k: "2", plc: "o" };
     expect(metaOf(group.get("blgr13_2"))).toEqual({ ...base, band: "middle" });
     expect(metaOf(group.get("blgr13_2Upper"))).toEqual({ ...base, band: "upper" });
     expect(metaOf(group.get("blgr13_2Lower"))).toEqual({ ...base, band: "lower" });
@@ -240,6 +240,7 @@ describe("metadata keys", () => {
       id: "bollinger",
       periods: "20",
       k: "2",
+      plc: "o",
       band: "middle",
     });
     expect(Object.fromEntries(bands.getUpper().getMeta!().asMap()).band).toBe("upper");
@@ -306,7 +307,7 @@ describe("metadata keys", () => {
     const group = new InstrumentGroupRTIndicator(INSTRUMENT).addPrice().rsi(14);
     const view = group.getReadOnlyExisting("rsi14");
     expect(view).not.toBe(group.getExisting("rsi14"));
-    expect(metaOf(view)).toEqual({ periods: "14", dsp: "P" });
+    expect(metaOf(view)).toEqual({ periods: "14", rng: "0:100", dsp: "P" });
     expect(view.getId!()).toBe("rsi");
     expect(view.getDisplayHint!()).toBe(DisplayHint.PERCENT);
   });
@@ -315,7 +316,7 @@ describe("metadata keys", () => {
     const group = new InstrumentGroupRTIndicator(INSTRUMENT).addPrice().rsi(14);
     group.sma("rsiAvg", "rsi14", 3);
     expect(metaOf(group.get("rsiAvg"))).toEqual({ periods: "3", src: "rsi14" });
-    expect(metaOf(group.get("rsi14"))).toEqual({ periods: "14", dsp: "P" });
+    expect(metaOf(group.get("rsi14"))).toEqual({ periods: "14", rng: "0:100", dsp: "P" });
   });
 });
 

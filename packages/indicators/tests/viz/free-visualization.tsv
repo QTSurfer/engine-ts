@@ -1,0 +1,23 @@
+# Source: the table the web team keeps for the charts (indicator-metadata.json, projected to the visualization keys), free rows.
+# Columns (tab-separated): id, default name, dsp, plc, rng, flo, lvl, outputs.
+# dsp: - absent (price), P percent, V volume, F fraction, R ratio, I index, N pure number.
+# outputs separated by " | ": "_" is the main output, otherwise the suffix; then sty=h|d, sde=u|d, drw=0, bnd.
+ema	ema20	-	o	-	-	-	_
+hma	hma20	-	o	-	-	-	_
+kama	kama10_2_30	-	o	-	-	-	_
+mma	mma20	-	o	-	-	-	_
+sma	sma20	-	o	-	-	-	_
+tema	tema20	-	o	-	-	-	_
+wma	wma20	-	o	-	-	-	_
+cci	cci20	N	-	-	-	0	_
+macd	macd	-	-	-	-	0	_
+rsi	rsi14	I	-	0:100	-	-	_
+stochRsi	stochRsi14	I	-	0:100	-	-	_
+bollinger	blgr20_2	-	o	-	-	-	_ | Upper bnd | Lower bnd
+bollingerBandwidth	blgr20_2	P	-	-	-	-	_ drw=0 | Upper drw=0 bnd | Lower drw=0 bnd | BW
+bollingerPercentB	pctB20_2	R	-	-	-	-	_
+atr	atr14	-	-	-	-	-	_
+percentVolatility	pvol20	P	-	-	-	-	_
+stdDev	stdDev20	-	-	-	-	-	_
+variance	variance20	N	-	-	-	-	_
+volatility	vol20	P	-	-	-	-	_

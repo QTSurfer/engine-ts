@@ -162,9 +162,9 @@ describe("macd", () => {
 
   it("describes its periods, and its source when it has one", () => {
     const group = priceGroup().macd().macd("m", 3, 5).ema("e", 4).macd("me", "e", 3, 5);
-    expect(metaOf(group, "macd")).toEqual({ shortPeriods: "12", longPeriods: "26" });
-    expect(metaOf(group, "m")).toEqual({ shortPeriods: "3", longPeriods: "5" });
-    expect(metaOf(group, "me")).toMatchObject({ shortPeriods: "3", longPeriods: "5", src: "e" });
+    expect(metaOf(group, "macd")).toEqual({ shortPeriods: "12", longPeriods: "26", lvl: "0" });
+    expect(metaOf(group, "m")).toEqual({ shortPeriods: "3", longPeriods: "5", lvl: "0" });
+    expect(metaOf(group, "me")).toMatchObject({ shortPeriods: "3", longPeriods: "5", src: "e", lvl: "0" });
     expect(group.getExisting("macd").getDisplayHint!()).toBe(DisplayHint.ABSOLUTE);
   });
 
@@ -210,11 +210,11 @@ describe("cci", () => {
     expect(group.get("mine")).toBeInstanceOf(CciRTIndicator);
   });
 
-  it("describes its periods and has no display hint", () => {
+  it("describes its periods, its zero line and reads as a pure number", () => {
     const group = priceGroup().cci(20).cci("mine", 14);
-    expect(metaOf(group, "cci20")).toEqual({ periods: "20" });
-    expect(metaOf(group, "mine")).toEqual({ periods: "14" });
-    expect(group.getExisting("cci20").getDisplayHint!()).toBe(DisplayHint.ABSOLUTE);
+    expect(metaOf(group, "cci20")).toEqual({ periods: "20", lvl: "0", dsp: "N" });
+    expect(metaOf(group, "mine")).toEqual({ periods: "14", lvl: "0", dsp: "N" });
+    expect(group.getExisting("cci20").getDisplayHint!()).toBe(DisplayHint.NUMBER);
   });
 
   it("is the distance from the mean over 0.015 times the mean absolute deviation", () => {
@@ -276,7 +276,7 @@ describe("stochRsi", () => {
 
   it("describes its periods and displays as a percentage", () => {
     const group = priceGroup().stochRsi(14);
-    expect(metaOf(group, "stochRsi14")).toEqual({ periods: "14", dsp: "P" });
+    expect(metaOf(group, "stochRsi14")).toEqual({ periods: "14", rng: "0:100", dsp: "P" });
     expect(group.getExisting("stochRsi14").getDisplayHint!()).toBe(DisplayHint.PERCENT);
   });
 
