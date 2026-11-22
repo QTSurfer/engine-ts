@@ -25,6 +25,7 @@ export abstract class AbstractSubscriptionStrategy<T> extends AbstractStrategy {
     InstrumentGroupRTIndicator
   >();
   private readonly instrumentStateStores = new Map<string, StateStore>();
+  private globalStateStore: StateStore | null = null;
   private readonly parsedInstruments = new Map<string, Instrument>();
 
   protected constructor(name?: string) {
@@ -144,6 +145,15 @@ export abstract class AbstractSubscriptionStrategy<T> extends AbstractStrategy {
       this.instrumentStateStores.set(instrument, store);
     }
     return store;
+  }
+
+  /**
+   * The strategy's global store: state that belongs to the strategy as a whole, not to one
+   * instrument. Created on first use and the same object on every call. It is a namespace of its
+   * own: a key written here is never seen through an instrument's store, nor the other way round.
+   */
+  getGlobalStateStore(): StateStore {
+    return (this.globalStateStore ??= new StateStore());
   }
 
   protected getRTIndicator(
