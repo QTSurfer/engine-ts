@@ -1,5 +1,17 @@
 # @qtsurfer/strategy
 
+## 0.16.0
+
+### Minor Changes
+
+- [#6](https://github.com/QTSurfer/engine-ts/pull/6) [`1c8f2cf`](https://github.com/QTSurfer/engine-ts/commit/1c8f2cf1a1d605879903a2774bdfa3bb8b271d10) Thanks [@mrmx](https://github.com/mrmx)! - A strategy has a global state store. `getGlobalStateStore()` returns the store of the strategy as a whole, created on first use and the same object on every call. It is a namespace of its own: a key written in it is never seen through an instrument's store (`getStateStore(instrument)`, which is unchanged), and the other way round. The windows of an instrument still use that instrument's store.
+
+### Patch Changes
+
+- Updated dependencies [[`f81518f`](https://github.com/QTSurfer/engine-ts/commit/f81518fff27ab53c3bfa90bf2a703e19e0c84138), [`dc30200`](https://github.com/QTSurfer/engine-ts/commit/dc3020010ec49670b6ec6da3d21189d9ee5de57f)]:
+  - @qtsurfer/indicators@0.16.0
+  - @qtsurfer/core@0.16.0
+
 ## 0.15.0
 
 ### Patch Changes
