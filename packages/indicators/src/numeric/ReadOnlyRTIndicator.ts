@@ -51,6 +51,20 @@ export class ReadOnlyRTIndicator extends AbstractRTIndicator {
     return this;
   }
 
+  // Hiding belongs to the registered entry, not to the indicator: a view registered under an
+  // internal name is an alias, so hide() marks the view only and never reaches the wrapped
+  // indicator, which may be published under its own name
+  private hiddenView = false;
+
+  override hide(): this {
+    this.hiddenView = true;
+    return this;
+  }
+
+  override isHidden(): boolean {
+    return this.hiddenView || (this.indicator.isHidden?.() ?? false);
+  }
+
   override getValue(): number {
     return this.indicator.getValue();
   }

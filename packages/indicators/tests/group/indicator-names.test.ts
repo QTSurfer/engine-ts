@@ -381,9 +381,25 @@ describe("visibility", () => {
     const map = new InstrumentMapRTIndicator(INSTRUMENT);
     const price = new ValueRTIndicator();
     map.add("price", price);
-    map.add("_view", map.getReadOnlyExisting("price"));
+    const view = map.getReadOnlyExisting("price");
+    map.add("_view", view);
     expect(price.isHidden()).toBe(false);
+    // The alias is hidden by its own flag, on a view of its own: the shared one stays as it was
+    const alias = map.getExisting("_view");
+    expect(alias).not.toBe(view);
+    expect(alias.isHidden!()).toBe(true);
+    expect(view.isHidden!()).toBe(false);
+    expect(map.getReadOnlyExisting("price")).toBe(view);
     expect(publicNames(map)).toEqual(["price"]);
+  });
+
+  it("an internal alias of a view hides that entry only, before or after other registrations", () => {
+    const map = new InstrumentMapRTIndicator(INSTRUMENT);
+    map.add("price", new ValueRTIndicator());
+    map.add("pubBefore", map.getReadOnlyExisting("price"));
+    map.add("_priceAlias", map.getReadOnlyExisting("price"));
+    map.add("pubAfter", map.getReadOnlyExisting("price"));
+    expect(publicNames(map)).toEqual(["price", "pubBefore", "pubAfter"]);
   });
 
   it("publishes every public indicator of a group in registration order", () => {

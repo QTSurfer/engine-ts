@@ -26,7 +26,13 @@ export class InstrumentMapRTIndicator extends AbstractRTIndicator {
     // The "_" namespace marks an internal indicator: it is updated but not published. The name is
     // read once, here, and becomes visibility metadata the publishing side reads instead.
     if (name.startsWith(InstrumentMapRTIndicator.PRIVATE_PREFIX) && indicator instanceof AbstractRTIndicator) {
-      indicator.hide();
+      if (indicator instanceof ReadOnlyRTIndicator) {
+        // A view handed out by getReadOnly is shared: the cache and any entry registered under
+        // another name hold the same instance. An internal alias gets a view of its own, so hiding
+        // it hides this entry and nothing else.
+        indicator = new ReadOnlyRTIndicator(indicator.indicator);
+      }
+      (indicator as AbstractRTIndicator).hide();
     }
     this.indicators.set(name, indicator);
     this.readOnlyCache.delete(name);

@@ -196,6 +196,19 @@ describe("ReadOnlyRTIndicator metadata", () => {
     expect(view.getMeta().isOverlay()).toBe(true);
   });
 
+  it("hide marks the view only, and a view of a hidden indicator reads as hidden", () => {
+    const sma = new SmaRTIndicator(3);
+    const view = new ReadOnlyRTIndicator(sma);
+    expect(view.isHidden()).toBe(false);
+    expect(view.hide()).toBe(view);
+    expect(view.isHidden()).toBe(true);
+    expect(sma.isHidden()).toBe(false);
+    expect(sma.getMeta().isHidden()).toBe(false);
+
+    const internal = new SmaRTIndicator(3).hide();
+    expect(new ReadOnlyRTIndicator(internal).isHidden()).toBe(true);
+  });
+
   it("drops a typed edit of a wrapped indicator that cannot carry it", () => {
     const bare: RTIndicator = {
       getValue: () => 1,
