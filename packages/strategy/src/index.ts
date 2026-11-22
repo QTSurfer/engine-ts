@@ -1,6 +1,8 @@
 export * from "$event/index";
 export * from "$execution/index";
 export type { Strategy } from "./Strategy";
+export { StrategyContext } from "./StrategyContext";
+export type { StrategyContextBuilder } from "./StrategyContext";
 export { StrategyStats } from "./StrategyStats";
 export { EngineVersion } from "./EngineVersion";
 export { StrategyCurrencyFilter } from "./StrategyCurrencyFilter";

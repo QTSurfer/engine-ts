@@ -97,6 +97,34 @@ class Dca extends AbstractTickerStrategy {
 
 `setPercentGain` takes 0 to 100 and `setMinGain` a non-negative number; anything else throws. The strategy only stores them (`getMinPercentGainMultiplier()` gives the percent as a fraction): reading them is up to the strategy. The backtest pipeline runs LONG only, so `setExecutionMode` and `setMultiEntryEnabled` are stored but do not change how it simulates. `getEngineVersion()`, `getEngineVersionMajor()` and `getEngineVersionMinor()` report the version of this package.
 
+### Attach and detach hooks
+
+A strategy is told when a market-data source is attached to it and when it is detached, by two hooks that do nothing unless it overrides them:
+
+```ts
+import { AbstractTickerStrategy, StrategyContext } from "@qtsurfer/strategy";
+
+class Watcher extends AbstractTickerStrategy {
+  override onAttach(context: StrategyContext) {
+    // before the first event: where the data comes from, and which instruments it covers
+    if (context.getTypeName() === "kline" && context.hasInstrument("BTC/USDT")) {
+      // ...
+    }
+  }
+
+  override onDetach(context: StrategyContext) {
+    // after the last event; the reason says why it ended (an empty string if none was given)
+    if (context.getReason() === StrategyContext.REASON_OWNER) {
+      // ...
+    }
+  }
+}
+```
+
+Both run in order with `update`, and a signal emitted from either is handled like one from `update`. `StrategyContext` is built with `StrategyContext.builder()` and read through scalars only: `getId()`, `getVenueType()` and `getVenueTypeName()` (`"cex"` or `"dex"`), `getExchange()`, `getSegment()`, `getType()` and `getTypeName()` (`"ticker"`, `"kline"` or `"funding"`), `getInstrumentCount()`, `getInstrument(index)`, `hasInstrument(symbol)`, `isWarmingUp()` and `getReason()` (`REASON_OWNER`, `REASON_REFUSED`, `REASON_POOL_GONE`, `REASON_CAPACITY` or `REASON_FUNDS`). `getVenueType()` and `getType()` return the `VenueType` and `MarketDataSource` enums of `@qtsurfer/core`; `instrumentList()` is the typed view of the instruments.
+
+`BacktestRunner` calls `onAttach` once before the first data point, with the id `"backtest"`, a `CEX` venue named `"backtest"`, the `"spot"` segment and the type of the run (`Ticker` for `run`, `KLine` for `runKlines`). The instruments are those the strategy holds before the run, sorted by symbol; a strategy that finds its instruments in the data has none to report yet. It calls `onDetach` once after the last data point, with the reason `OWNER`, also when an update throws (the update's error is the one the caller sees). It does not call `onDetach` if `onAttach` threw. A signal emitted from `onAttach` carries the time of the first data point, and one from `onDetach` the time of the last (for a bar, its close time).
+
 ### Backtesting
 
 ```ts

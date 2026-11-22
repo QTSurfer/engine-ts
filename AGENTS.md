@@ -110,6 +110,7 @@ packages/
     already resolved (the `StateStoreSupport` indirection is gone)
   - `operators/Predicates` — numeric predicate factories (`positive`, `lessThan`, `greaterOrEqual`, etc.)
   - `operators/Unaries` — numeric unary operator factories (`plus`, `multiply`, `clamp`, etc.)
+  - `VenueType` (`CEX`, `DEX`) and `MarketDataSource` (`Ticker`, `KLine`, `FundingRate`) — enums of the kind of venue and of data a source carries
 
 - **@qtsurfer/indicators** — Real-time streaming indicator implementations ported from `qtsurfer-engine-indicators`:
   - `core/` — Base classes: `RTIndicator` interface, `IndicatorMeta` and `DisplayHint` (what an indicator says about itself), `AbstractRTIndicator`, `AbstractIncrementalRTIndicator`, `AbstractDecorableRTIndicator`, `AbstractDecorableIncrementalRTIndicator`, `AbstractEmaRTIndicator`, `AbstractWindowSeriesRTIndicator`
@@ -127,7 +128,7 @@ packages/
   - vitest bench suite comparing throughput: RT native vs trading-signals
   - Run: `pnpm --filter @qtsurfer/indicators-trading-signals test` / `bench`
 
-- **@qtsurfer/strategy** — Strategy framework: signal hierarchy, the strategy classes (`AbstractStrategy`, `AbstractTickerStrategy`, `AbstractKlineStrategy`), the backtest execution pipeline with its simulation layer, yield metrics. Also holds the cross-engine conformance suite (`tests/conformance/`)
+- **@qtsurfer/strategy** — Strategy framework: signal hierarchy, the strategy classes (`AbstractStrategy`, `AbstractTickerStrategy`, `AbstractKlineStrategy`), the `onAttach` / `onDetach` hooks and their `StrategyContext`, the backtest execution pipeline with its simulation layer, yield metrics. Also holds the cross-engine conformance suite (`tests/conformance/`)
 
 ## Architecture
 
