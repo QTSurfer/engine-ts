@@ -1,6 +1,7 @@
 import type { Asset } from "@qtsurfer/core";
 import { EngineVersion } from "./EngineVersion";
 import type { Strategy } from "./Strategy";
+import type { StrategyContext } from "./StrategyContext";
 import { StrategyCurrencyFilter } from "./StrategyCurrencyFilter";
 import type { StrategyPropertyDef, StrategyPropertyInit } from "./StrategyPropertyDef";
 import { StrategyPropertyManager, type PropertyAccessors } from "./StrategyPropertyManager";
@@ -200,6 +201,24 @@ export abstract class AbstractStrategy implements Strategy {
 
   reset(_instrument: string): void {}
 
+  /**
+   * Does nothing; override it to be told when a source is attached. See {@link Strategy.onAttach}.
+   *
+   * @throws TypeError if `context` is null or undefined
+   */
+  onAttach(context: StrategyContext): void {
+    requireContext(context);
+  }
+
+  /**
+   * Does nothing; override it to be told when a source is detached. See {@link Strategy.onDetach}.
+   *
+   * @throws TypeError if `context` is null or undefined
+   */
+  onDetach(context: StrategyContext): void {
+    requireContext(context);
+  }
+
   /** The engine version this strategy runs on (e.g. `"0.11.0"`), or `"unknown"`. */
   protected getEngineVersion(): string {
     return EngineVersion.get();
@@ -262,6 +281,10 @@ export abstract class AbstractStrategy implements Strategy {
   yieldTimestamp(fallback: number): number {
     return fallback;
   }
+}
+
+function requireContext(context: StrategyContext): void {
+  if (context == null) throw new TypeError("context must not be null");
 }
 
 /** A decimal-point shift, not a division: `0.7` percent is exactly `0.007`, not `0.006999...`. */

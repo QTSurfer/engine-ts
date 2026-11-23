@@ -52,6 +52,8 @@ describe("Java parity: member names", () => {
       "getEngineVersionMinor",
       "getMinPercentGainMultiplier",
       "acceptCurrency",
+      "onAttach",
+      "onDetach",
       // the property API: setProperty and applyProperty are the one typed path here, see the
       // property tests; getPropertyInfos/getPropertyInfo/registerPropertyInfo are renamed
       "setProperty",

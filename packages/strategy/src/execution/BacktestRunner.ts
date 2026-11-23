@@ -1,3 +1,4 @@
+import { Instrument, MarketDataSource, VenueType } from "@qtsurfer/core";
 import type { Kline, Ticker } from "@qtsurfer/core";
 import type { MarketHintSignal } from "$signal/MarketHintSignal";
 import { MarketHintKind } from "$signal/MarketHintSignal";
@@ -5,6 +6,8 @@ import type { StrategyYield } from "$yield/StrategyYield";
 import type { AbstractKlineStrategy } from "../AbstractKlineStrategy";
 import type { AbstractSubscriptionStrategy } from "../AbstractSubscriptionStrategy";
 import type { AbstractTickerStrategy } from "../AbstractTickerStrategy";
+import type { Strategy } from "../Strategy";
+import { StrategyContext } from "../StrategyContext";
 import type { BacktestConfig } from "./BacktestConfig";
 import { BacktestExecutionPipeline } from "./BacktestExecutionPipeline";
 import type { EquityPoint, RunOptions, SessionOutput } from "./SessionOutput";
@@ -52,7 +55,7 @@ export class BacktestRunner {
     config: BacktestConfig,
     options?: RunOptions,
   ): BacktestResult {
-    return BacktestRunner.replay(strategy, tickers, config, options, (ticker) => {
+    return BacktestRunner.replay(strategy, tickers, MarketDataSource.Ticker, config, options, (ticker) => {
       strategy.update(ticker);
     }, (ticker) => ticker);
   }
@@ -68,14 +71,25 @@ export class BacktestRunner {
     config: BacktestConfig,
     options?: RunOptions,
   ): BacktestResult {
-    return BacktestRunner.replay(strategy, klines, config, options, (kline) => {
+    return BacktestRunner.replay(strategy, klines, MarketDataSource.KLine, config, options, (kline) => {
       strategy.update(kline);
     }, klineAsTicker);
   }
 
+  /**
+   * The one per-run body, shared by `run` and `runKlines`. Exactly two things depend on what is
+   * replayed: how a data point reaches the strategy (`feedStrategy`) and how it is presented to the
+   * pipeline (`asTicker`). `type` names the data for the strategy's attachment context.
+   *
+   * The strategy is told about its source around the loop: `onAttach` once before the first data
+   * point and `onDetach` once after the last, even when the loop throws, but not when `onAttach`
+   * itself threw. Both run before the result is built, so a trade they cause is part of it. See
+   * {@link attachmentContext}.
+   */
   private static replay<T>(
     strategy: AbstractSubscriptionStrategy<T>,
     items: readonly T[],
+    type: MarketDataSource,
     config: BacktestConfig,
     options: RunOptions | undefined,
     feedStrategy: (item: T) => void,
@@ -115,43 +129,120 @@ export class BacktestRunner {
       }
     });
 
-    // Feed the data. The pipeline is updated *before* the strategy sees the
-    // point so that any signal emitted during `strategy.update` resolves its
-    // fill with the current bar already in scope (relevant for slippage
-    // models that consult bar high/low).
-    let sessionStart: number | undefined;
-    let sessionEnd: number | undefined;
-    for (const item of items) {
-      const ticker = asTicker(item);
-      sessionStart ??= ticker.timestamp;
-      sessionEnd = ticker.timestamp;
-      pipeline.onTicker(ticker);
-      feedStrategy(item);
-      recorder.point(ticker.instrument, ticker.timestamp);
+    try {
+      const attachment = attachmentContext(strategy, type);
+      // Before the first data point the strategy has seen no time, and a signal emitted from
+      // onAttach would carry zero. The first data point's own time is the earliest deterministic
+      // one, so the clock is lent to the hook. It is given back afterwards: a strategy whose
+      // update() never advances the clock keeps stamping what it emits with whatever it had before.
+      const clock = strategy.lastEventTimestamp;
+      if (items.length > 0) {
+        strategy.lastEventTimestamp = asTicker(items[0] as T).timestamp;
+      }
+      try {
+        // If this throws the run never started, so there is nothing to detach: the exception
+        // leaves through the outer finally, which only releases what this method built.
+        strategy.onAttach(attachment);
+      } finally {
+        strategy.lastEventTimestamp = clock;
+      }
+
+      // Feed the data. The pipeline is updated *before* the strategy sees the
+      // point so that any signal emitted during `strategy.update` resolves its
+      // fill with the current bar already in scope (relevant for slippage
+      // models that consult bar high/low).
+      let sessionStart: number | undefined;
+      let sessionEnd: number | undefined;
+      let replayed = false;
+      try {
+        for (const item of items) {
+          const ticker = asTicker(item);
+          sessionStart ??= ticker.timestamp;
+          sessionEnd = ticker.timestamp;
+          pipeline.onTicker(ticker);
+          feedStrategy(item);
+          recorder.point(ticker.instrument, ticker.timestamp);
+        }
+        replayed = true;
+      } finally {
+        detach(strategy, attachment, replayed);
+      }
+
+      // Bucketed over the replayed data's span, as the Java engine's runner does
+      const snapshot =
+        sessionStart === undefined || sessionEnd === undefined ? metrics.snapshot() : metrics.snapshot(sessionStart, sessionEnd);
+      // The curve starts where the session does, at the initial funding, then steps at each trade
+      const anchor: EquityPoint | undefined =
+        sessionStart === undefined ? undefined : { timestamp: sessionStart, equity: config.initialFunding };
+
+      return {
+        yields,
+        metrics: snapshot,
+        finalEquity: config.initialFunding + metrics.getPnlTotal(),
+        finalBalance: pipeline.getBalance(),
+        totalTicks: items.length,
+        feesByAsset: pipeline.getFeesByAsset(),
+        session: recorder.finish(anchor, snapshot.equityPoints),
+      };
+    } finally {
+      // Cleanup
+      unsubSignal();
+      metrics.dispose();
     }
+  }
+}
 
-    // Bucketed over the replayed data's span, as the Java engine's runner does
-    const snapshot =
-      sessionStart === undefined || sessionEnd === undefined ? metrics.snapshot() : metrics.snapshot(sessionStart, sessionEnd);
-    // The curve starts where the session does, at the initial funding, then steps at each trade
-    const anchor: EquityPoint | undefined =
-      sessionStart === undefined ? undefined : { timestamp: sessionStart, equity: config.initialFunding };
+/** The attachment id of every backtest: a replay has one source, so there is nothing to tell apart. */
+const ATTACHMENT_ID = "backtest";
 
-    const result: BacktestResult = {
-      yields,
-      metrics: snapshot,
-      finalEquity: config.initialFunding + metrics.getPnlTotal(),
-      finalBalance: pipeline.getBalance(),
-      totalTicks: items.length,
-      feesByAsset: pipeline.getFeesByAsset(),
-      session: recorder.finish(anchor, snapshot.equityPoints),
-    };
+/** The venue a backtest says its data comes from: a replay has no venue to ask. */
+const EXCHANGE = "backtest";
 
-    // Cleanup
-    unsubSignal();
-    metrics.dispose();
+/** The segment a backtest says its data belongs to; a run config has no other to offer. */
+const SEGMENT = "spot";
 
-    return result;
+/**
+ * What the strategy is told about the source of a backtest, for `onAttach` and, in its detached
+ * form, `onDetach`. Built once per run, before the first data point.
+ *
+ * - `id`: always `"backtest"`, so a backtest names its attachment the same way every time.
+ * - `venueType` and `segment`: `VenueType.CEX` and `"spot"`. The run config carries neither, and a
+ *   replay has no venue to ask.
+ * - `exchange`: `"backtest"`.
+ * - `type`: what the run replays, `MarketDataSource.Ticker` or `MarketDataSource.KLine`, passed
+ *   down by the entry point that knows it.
+ * - `instruments`: those the strategy holds before it has seen any data, sorted by symbol so the
+ *   order does not depend on insertion. For a strategy that discovers its instruments from the
+ *   data this is empty, because the runner does not read ahead.
+ * - `warmingUp`: false. A backtest replays its own warm-up as ordinary data.
+ */
+function attachmentContext(strategy: Strategy, type: MarketDataSource): StrategyContext {
+  return StrategyContext.builder()
+    .id(ATTACHMENT_ID)
+    .venueType(VenueType.CEX)
+    .exchange(EXCHANGE)
+    .segment(SEGMENT)
+    .type(type)
+    .instruments(
+      [...strategy.instruments]
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        .map((symbol) => Instrument.parse(symbol)),
+    )
+    .warmingUp(false)
+    .build();
+}
+
+/**
+ * Tells the strategy its source is gone, at the owner's will.
+ *
+ * When the replay itself failed (`replayCompleted` is false) a failure of the hook is dropped, so
+ * it cannot replace the error that ended the run.
+ */
+function detach(strategy: Strategy, attachment: StrategyContext, replayCompleted: boolean): void {
+  try {
+    strategy.onDetach?.(attachment.detached(StrategyContext.REASON_OWNER));
+  } catch (error) {
+    if (replayCompleted) throw error;
   }
 }
 

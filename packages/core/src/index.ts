@@ -18,5 +18,7 @@ export {
   DatedFutureInstrument,
 } from "./Instrument";
 export { Asset } from "./Asset";
+export { MarketDataSource } from "./MarketDataSource";
+export { VenueType } from "./VenueType";
 export * as CurrencyHelper from "./CurrencyHelper";
 export type { Currency } from "./Currency";

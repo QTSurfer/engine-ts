@@ -17,6 +17,8 @@ npm install @qtsurfer/core
 - **`Asset`** — A currency code, upper-cased (`Asset.of("usdt").code === "USDT"`), equal by code
 - **`CurrencyHelper`** — Asset-code sets and `¿` wildcard matching behind the strategy currency filter
 - **`Currency`** — Type alias for `string`
+- **`VenueType`** — Enum of the kinds of venue a market data source can come from: `CEX` or `DEX`
+- **`MarketDataSource`** — Enum of the kinds of market data: `Ticker`, `KLine` or `FundingRate`
 
 ### Data Structures
 
