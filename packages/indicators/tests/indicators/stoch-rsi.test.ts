@@ -75,8 +75,17 @@ describe("StochasticRsiRTIndicator", () => {
   });
 
   it("computes values that vary and are not stuck at zero", () => {
+    // Only the readings the indicator says are valid count: the first ones, made while the RSI warms
+    // up (it says 0) and the window of RSI values fills, were what once passed for a high reading.
+    // A wandering series of 200 bars gives the indicator many windows to rank the RSI in.
     const stochRsi = new StochasticRsiRTIndicator(14);
-    const values = CLOSE_PRICES_LIST.map((price) => stochRsi.update(price));
+    const values: number[] = [];
+    for (let i = 0; i < 200; i++) {
+      const value = stochRsi.update(100 + 12 * Math.sin(i / 5) + 3 * Math.cos(i / 1.7));
+      if (stochRsi.isReady()) {
+        values.push(value);
+      }
+    }
     expect(Math.max(...values)).toBeGreaterThan(50);
     expect(Math.max(...values) - Math.min(...values)).toBeGreaterThan(10);
   });
@@ -86,15 +95,14 @@ describe("StochasticRsiRTIndicator", () => {
     // and the averages are held in between.
     //   tick 3: avg gain (0 + 2 + 0) / 3 = 2/3, avg loss (0 + 0 + 1) / 3 = 1/3, RS 2, RSI 100 - 100/3
     //   tick 6: avg gain (2 + 1 + 0) / 3 = 1,   avg loss (0 + 0 + 1) / 3 = 1/3, RS 3, RSI 75
-    // RSI by tick: 0, 0, 66.67, 66.67, 66.67, 75. StochRSI is 100 * (rsi - min) / (max - min) over
-    // the last 3 RSI values:
-    //   tick 1: [0]                  num 0 -> 0
-    //   tick 2: [0, 0]               num 0 -> 0
-    //   tick 3: [0, 0, 66.67]        100 * 66.67 / 66.67 = 100
-    //   tick 4: [0, 66.67, 66.67]    100 * 66.67 / 66.67 = 100
-    //   tick 5: [66.67 x3]           num 0 -> 0
+    // RSI by tick: 0, 0, 66.67, 66.67, 66.67, 75. The RSI is ready from tick 3, and only its valid
+    // values go into the window. StochRSI is 100 * (rsi - min) / (max - min) over that window:
+    //   tick 1, 2: the RSI is warming up (it says 0)   0
+    //   tick 3: [66.67]              num 0 -> 0
+    //   tick 4: [66.67 x2]           num 0 -> 0
+    //   tick 5: [66.67 x3]           num 0 -> 0   (the window is full: ready from here, tick 2n - 1)
     //   tick 6: [66.67, 66.67, 75]   100 * 8.33 / 8.33 = 100
     const stochRsi = new StochasticRsiRTIndicator(3);
-    expect([10, 12, 11, 13, 14, 13].map((price) => stochRsi.update(price))).toEqual([0, 0, 100, 100, 0, 100]);
+    expect([10, 12, 11, 13, 14, 13].map((price) => stochRsi.update(price))).toEqual([0, 0, 0, 0, 0, 100]);
   });
 });

@@ -1,8 +1,14 @@
 import { AbstractRTIndicator } from "$core/AbstractRTIndicator";
 import type { IndicatorNotice } from "$core/IndicatorNotice";
 import { noticeKey } from "$core/IndicatorNotice";
+import { IndicatorMeta } from "$core/IndicatorMeta";
 import type { RTIndicator } from "$core/RTIndicator";
 import { ReadOnlyRTIndicator } from "$numeric/ReadOnlyRTIndicator";
+
+/** The id an indicator tells, or the one its class name implies when it does not tell one. */
+function idOf(indicator: RTIndicator): string {
+  return indicator.getId?.() ?? IndicatorMeta.deriveId(indicator.constructor);
+}
 
 /**
  * A map of RTIndicators for an instrument.
@@ -34,7 +40,16 @@ export class InstrumentMapRTIndicator extends AbstractRTIndicator {
       }
       (indicator as AbstractRTIndicator).hide();
     }
+    const replaced = this.indicators.get(name);
     this.indicators.set(name, indicator);
+    if (replaced !== undefined && replaced !== indicator) {
+      // A name reads one indicator: the last registered under it. Two builders that default to the
+      // same name (or an explicit name used twice) make the first one unreachable without a word,
+      // and a strategy then reads one believing it reads the other.
+      console.warn(
+        `The name '${name}' now reads a different indicator: ${idOf(indicator)} replaced ${idOf(replaced)}`,
+      );
+    }
     this.readOnlyCache.delete(name);
     return this;
   }

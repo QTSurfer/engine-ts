@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { DistanceFromMaRTIndicator } from "$indicators/DistanceFromMaRTIndicator";
 import { SmaRTIndicator } from "$averages/SmaRTIndicator";
+import { EmaRTIndicator } from "$averages/EmaRTIndicator";
+import { MmaRTIndicator } from "$averages/MmaRTIndicator";
+import { WmaRTIndicator } from "$averages/WmaRTIndicator";
+import { WmaIncrementalRTIndicator } from "$averages/WmaIncrementalRTIndicator";
+import { HmaRTIndicator } from "$averages/HmaRTIndicator";
+import { TemaRTIndicator } from "$averages/TemaRTIndicator";
+import { KamaRTIndicator } from "$averages/KamaRTIndicator";
+import { RsiRTIndicator } from "$indicators/RsiRTIndicator";
+import { ReadOnlyRTIndicator } from "$numeric/ReadOnlyRTIndicator";
+import { InstrumentGroupRTIndicator } from "$group/InstrumentGroupRTIndicator";
+import type { RTIndicator } from "$core/RTIndicator";
 
 describe("DistanceFromMaRTIndicator", () => {
   // SmaRTIndicator(3) in discrete mode:
@@ -65,5 +76,50 @@ describe("DistanceFromMaRTIndicator", () => {
       expect(distance.isReady()).toBe(false);
       expect(sma.isReady()).toBe(false);
     });
+  });
+  it("accepts every moving average, and a read-only view of each", () => {
+    const averages: RTIndicator[] = [
+      new SmaRTIndicator(5),
+      new EmaRTIndicator(5),
+      new MmaRTIndicator(5),
+      new WmaRTIndicator(5),
+      new WmaIncrementalRTIndicator(5),
+      new HmaRTIndicator(5),
+      new TemaRTIndicator(5),
+      new KamaRTIndicator(),
+    ];
+    for (const average of averages) {
+      expect(() => new DistanceFromMaRTIndicator(average), average.getId!()).not.toThrow();
+      expect(
+        () => new DistanceFromMaRTIndicator(new ReadOnlyRTIndicator(average)),
+        `a read-only view of ${average.getId!()}`,
+      ).not.toThrow();
+    }
+  });
+
+  it("refuses an indicator that is not a moving average, even behind a view", () => {
+    const rsi = new RsiRTIndicator();
+
+    expect(() => new DistanceFromMaRTIndicator(rsi)).toThrow("Not a moving average indicator: rsi");
+    expect(() => new DistanceFromMaRTIndicator(new ReadOnlyRTIndicator(rsi))).toThrow(
+      "Not a moving average indicator: rsi",
+    );
+  });
+
+  it("is accepted by the group for any registered average and refused for the rest", () => {
+    const group = new InstrumentGroupRTIndicator("BTC/USDT")
+      .addPrice()
+      .sma("sma", 3)
+      .wma("wma", 3)
+      .hma("hma", 4)
+      .tema("tema", 3)
+      .kama("kama", 2, 2, 30)
+      .rsi("rsi", 14);
+
+    for (const name of ["sma", "wma", "hma", "tema", "kama"]) {
+      expect(() => group.distanceMa(`dist-${name}`, name), name).not.toThrow();
+    }
+    expect(() => group.distanceMa("dist-rsi", "rsi")).toThrow("Not a moving average indicator: rsi");
+    expect(group.get("dist-rsi"), "nothing is registered by a refused call").toBeUndefined();
   });
 });

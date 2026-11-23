@@ -41,6 +41,15 @@ export class MinRTIndicator extends AbstractDecorableIncrementalRTIndicator {
     return min;
   }
 
+  /**
+   * A decorated source feeds this indicator only once it is ready: the first value this one sees
+   * seeds the running minimum, and a source still warming up gives values (an RSI starts at 0) that
+   * would stay in it for the whole run.
+   */
+  protected override consumes(decorated: RTIndicator): boolean {
+    return decorated.isReady();
+  }
+
   protected override nextValue(prevValue: number, newValue: number): number {
     if (newValue < prevValue) {
       return this.setValue(newValue);

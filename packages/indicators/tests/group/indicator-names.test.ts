@@ -68,7 +68,7 @@ describe("registered names carry no display suffix", () => {
     group.distance("price", "ema12").distanceMa("ma").percentChange("price");
     group.bollinger(13, 2).bollingerBandwidth("blgr13_2");
 
-    for (const name of ["rsi14", "rsi7", "distpriceema12", "distma", "chgprice", "blgr13_2BW"]) {
+    for (const name of ["rsi14", "rsi7", "distpriceema12", "distma", "pchgprice", "blgr13_2BW"]) {
       expect(group.get(name), name).toBeDefined();
     }
     const names: string[] = [];
@@ -82,7 +82,7 @@ describe("registered names carry no display suffix", () => {
     group.distance("price", "ema12").distanceMa("ma").percentChange("price");
     group.bollinger("bb", 2, 2).bollingerBandwidth("bb");
 
-    for (const name of ["rsi14%", "distpriceema12%", "distma%", "chgprice%", "bbBW%"]) {
+    for (const name of ["rsi14%", "distpriceema12%", "distma%", "pchgprice%", "chgprice%", "bbBW%"]) {
       expect(group.get(name), name).toBeUndefined();
     }
   });
@@ -118,7 +118,7 @@ describe("display hints", () => {
     group.rsi(14).distance("price", "ema12").distanceMa("ma").percentChange("price");
     group.bollinger("bb", 2, 2).bollingerBandwidth("bb");
 
-    for (const name of ["rsi14", "distpriceema12", "distma", "chgprice", "bbBW"]) {
+    for (const name of ["rsi14", "distpriceema12", "distma", "pchgprice", "bbBW"]) {
       expect(hintOf(group, name), name).toBe(DisplayHint.PERCENT);
       expect(metaOf(group.get(name)).dsp, name).toBe("P");
     }

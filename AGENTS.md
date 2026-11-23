@@ -115,7 +115,7 @@ packages/
 - **@qtsurfer/indicators** — Real-time streaming indicator implementations ported from `qtsurfer-engine-indicators`:
   - `core/` — Base classes: `RTIndicator` interface, `IndicatorMeta` and `DisplayHint` (what an indicator says about itself), `AbstractRTIndicator`, `AbstractIncrementalRTIndicator`, `AbstractDecorableRTIndicator`, `AbstractDecorableIncrementalRTIndicator`, `AbstractEmaRTIndicator`, `AbstractWindowSeriesRTIndicator`
   - `averages/` — `EmaRTIndicator`, `MmaRTIndicator`, `SmaRTIndicator` (discrete + moving modes), `WmaRTIndicator`, `WmaIncrementalRTIndicator` (O(1) incremental), `HmaRTIndicator`, `TemaRTIndicator`, `KamaRTIndicator`
-  - `numeric/` — `ValueRTIndicator`, `ConstantRTIndicator`, `ReadOnlyRTIndicator`, `SumRTIndicator`, `RoundRTIndicator`, `TransformRTIndicator`, `ClampRTIndicator`, `ClampPredicateRTIndicator`, `PredicateRTIndicator`, `ConditionalRTIndicator`, `BiFunctionRTIndicator`
+  - `numeric/` — `ValueRTIndicator`, `ConstantRTIndicator`, `ReadOnlyRTIndicator`, `SumRTIndicator`, `RoundRTIndicator`, `TransformRTIndicator`, `ClampRTIndicator`, `ClampPredicateRTIndicator`, `PredicateRTIndicator`, `ConditionRTIndicator`, `ConditionalRTIndicator`, `BiFunctionRTIndicator`
   - `statistics/` — `MovingAverage` (O(1) rolling), `VarianceRTIndicator`, `StandardDeviationRTIndicator`
   - `helpers/` — `PeriodCounterRTIndicator`, `GainRTIndicator`, `LossRTIndicator`, `MaxRTIndicator`, `MinRTIndicator`, `CountRTIndicator`, `RateChangeRTIndicator`, `PredicatePeriodCounterRTIndicator`, `PercentChangePeriodRTIndicator`, `VolatilityRTIndicator`, `PercentVolatilityRTIndicator`, `OnChangeRTIndicator`, `WindowTimeRTIndicator`
   - `indicators/` — `RsiRTIndicator`, `MacdRTIndicator`, `CciRTIndicator`, `StochasticRsiRTIndicator`, `DistanceRTIndicator`, `DistanceFromMaRTIndicator`, `AtrRTIndicator`
@@ -150,7 +150,7 @@ interface RTIndicator extends Resettable {
 ```
 
 ### Names and metadata
-- A registered name carries no display suffix: `rsi(14)` registers `rsi14`, `percentChange("price")` registers `chgprice`. A name that still has a `%` does not resolve.
+- A registered name carries no display suffix: `rsi(14)` registers `rsi14`, `percentChange("price")` registers `pchgprice` (`rateChange("price")` registers `chgprice`). A name that still has a `%` does not resolve.
 - What a name used to encode rides the indicator's `IndicatorMeta` (`id`, `periods`, `k`, `band`, `src`, `dsp`, `vis`). `DisplayHint` is the typed view of `dsp`: `ABSOLUTE` (no entry), `PERCENT` (`P`), `VOLUME` (`V`).
 - Metadata is a write-only descriptor: an indicator never reads it to compute. `ReadOnlyRTIndicator` reads and writes the metadata of the indicator it wraps.
 - A `_`-prefixed name is internal. `InstrumentMapRTIndicator.add` turns it into hidden metadata, and `forEachPublicable` (so the info signal) skips hidden indicators, which are still updated.
