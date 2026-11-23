@@ -1,5 +1,0 @@
----
-"@qtsurfer/strategy": minor
----
-
-A strategy can ask the platform to detach a market-data source. `detach(instrument)` asks for the source that reads that instrument, and `detach(context)`, for use from `onAttach` and `onDetach`, for the attachment the context describes, named by its id; the signal is about the first instrument of the context, or about its exchange and segment when it has none. Each emits a new `SystemSignal`, of the new event type `StrategyEventType.System` with the action `DETACH`, an optional `attachment` id and an optional `reason`. It is a signal for the platform that hosts the run, not an order: an execution pipeline ignores it, and a host that has no source to detach, such as a backtest, does nothing with it. `setSourceDetaching(boolean)` is for the host: while it is set around `onDetach`, `detach(...)` emits nothing. `StrategyContext.REASON_STRATEGY` (`"STRATEGY"`) is a new detach reason, for an attachment the strategy itself ended, accepted wherever the other reasons are. These mirror the Java engine.
