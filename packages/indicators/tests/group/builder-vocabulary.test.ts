@@ -115,6 +115,14 @@ describe("the Java builder vocabulary", () => {
     "greatThan",
     "lessOrEqual",
     "lessThan",
+    "isEqual",
+    "isNotEqual",
+    "isGreatOrEqual",
+    "isGreatThan",
+    "isLessOrEqual",
+    "isLessThan",
+    "isTrue",
+    "isValue",
     "predicate",
     "periodCount",
     "conditional",
@@ -143,6 +151,8 @@ describe("the Java builder vocabulary", () => {
     expect(InstrumentGroupRTIndicator.PREFIX_CCI).toBe("cci");
     expect(InstrumentGroupRTIndicator.PREFIX_STOCH_RSI).toBe("stochRsi");
     expect(InstrumentGroupRTIndicator.PREFIX_CLAMP).toBe("clmp");
+    expect(InstrumentGroupRTIndicator.PREFIX_RATE_CHANGE).toBe("chg");
+    expect(InstrumentGroupRTIndicator.PREFIX_PERCENT_CHANGE).toBe("pchg");
     expect(InstrumentGroupRTIndicator.PREFIX_WINDOW).toBe("_win");
   });
 });
@@ -282,11 +292,12 @@ describe("stochRsi", () => {
 
   it("is where the RSI sits in its own range of the last periods", () => {
     // Cutler RSI(3) over 10, 12, 11, 13, 14, 13 is 0, 0, 66.67, 66.67, 66.67, 75 (averages move
-    // at ticks 3 and 6). StochRSI = 100 * (rsi - min) / (max - min) over the last 3 RSI values:
-    //   [0] 0   [0, 0] 0   [0, 0, 66.67] 100   [0, 66.67, 66.67] 100   [66.67 x3] 0   [66.67, 66.67, 75] 100
+    // at ticks 3 and 6). Its first two values are the warm-up of the RSI and stay out of the window.
+    // StochRSI = 100 * (rsi - min) / (max - min) over the last 3 valid RSI values:
+    //   warm-up 0   0   [66.67] 0   [66.67 x2] 0   [66.67 x3] 0   [66.67, 66.67, 75] 100
     // The discrete averages (the flag): the default is Wilder's now, see below
     const group = priceGroup().stochRsi(3, true);
-    expect(series(group, "stochRsi3", [10, 12, 11, 13, 14, 13])).toEqual([0, 0, 100, 100, 0, 100]);
+    expect(series(group, "stochRsi3", [10, 12, 11, 13, 14, 13])).toEqual([0, 0, 0, 0, 0, 100]);
   });
 
   it("takes the same values through the positional and the named form", () => {

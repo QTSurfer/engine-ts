@@ -76,6 +76,7 @@ About 40 ns per update at any period for `"fast"`, against 60 ns at 20 periods, 
 | Derived | `gain`, `loss`, `max`, `min`, `sum`, `distance`, `distanceMa`, `percentChange`, `rateChange`, `round`, `clamp`, `decorate` |
 | Arithmetic | `add`, `diff`, `mul`, `fun` |
 | Comparisons | `equal`, `notEqual`, `greatThan`, `greatOrEqual`, `lessThan`, `lessOrEqual`, `predicate`, `periodCount`, `conditional` |
+| Conditions | `isEqual`, `isNotEqual`, `isGreatThan`, `isGreatOrEqual`, `isLessThan`, `isLessOrEqual`, `isTrue`, read as a flag with `isValue(name)` |
 | Registration | `add(name, indicator)`, `add(name, indicator, displayHint)`, `add(name, valueSource)`, `add(name, valueSource, indicator)` |
 
 ```ts
@@ -85,7 +86,7 @@ group.greatThan("overbought", "rsi14", 70, "price", "ema12"); // the price while
 
 ## Names and metadata
 
-An indicator is registered under a plain name and looked up by it: `.rsi(14)` registers `rsi14`, `.distance("price", "ema12")` registers `distpriceema12`, `.percentChange("price")` registers `chgprice`, and `.bollingerBandwidth("bb")` registers `bbBW`. No display suffix is added to a name.
+An indicator is registered under a plain name and looked up by it: `.rsi(14)` registers `rsi14`, `.distance("price", "ema12")` registers `distpriceema12`, `.percentChange("price")` registers `pchgprice` (`.rateChange("price")` registers `chgprice`), and `.bollingerBandwidth("bb")` registers `bbBW`. No display suffix is added to a name.
 
 What a name used to carry travels in the indicator's metadata instead. `indicator.getMeta()` returns an `IndicatorMeta` of short string entries, for example `id`, `periods`, `k`, `band`, `src` (the indicator it derives from) and `dsp` (`P` for a percentage, `V` for a volume; absent means absolute). `indicator.getDisplayHint()` is the typed view of `dsp`. `getId()` is the indicator type: the `id` entry when there is one, else the class name without its `RTIndicator` suffix (`RsiRTIndicator` is `rsi`).
 

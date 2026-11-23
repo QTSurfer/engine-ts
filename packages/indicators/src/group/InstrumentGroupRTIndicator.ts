@@ -31,6 +31,7 @@ import { ClampRTIndicator } from "$numeric/ClampRTIndicator";
 import { ClampPredicateRTIndicator } from "$numeric/ClampPredicateRTIndicator";
 import { ConditionalRTIndicator } from "$numeric/ConditionalRTIndicator";
 import { PredicateRTIndicator } from "$numeric/PredicateRTIndicator";
+import { ConditionRTIndicator } from "$numeric/ConditionRTIndicator";
 import { GainRTIndicator } from "$helpers/GainRTIndicator";
 import { LossRTIndicator } from "$helpers/LossRTIndicator";
 import { MaxRTIndicator } from "$helpers/MaxRTIndicator";
@@ -86,6 +87,8 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
   static readonly PREFIX_DIFF = "diff";
   static readonly PREFIX_MUL = "mul";
   static readonly PREFIX_RATE_CHANGE = "chg";
+  /** The default name prefix of `percentChange`: apart from `chg`, which is a fraction. */
+  static readonly PREFIX_PERCENT_CHANGE = "pchg";
   static readonly PREFIX_CLAMP = "clmp";
   static readonly PREFIX_ROUND = "round";
   static readonly SUBFIX_BOLLINGER_UPPER = "Upper";
@@ -109,6 +112,11 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
   /** An index that stays between 0 and 100. */
   private static readonly ZERO_TO_HUNDRED = (meta: IndicatorMeta): void => {
     meta.setRange(0, 100);
+  };
+
+  /** A condition: 1 while it holds, 0 while it does not. */
+  private static readonly ZERO_TO_ONE = (meta: IndicatorMeta): void => {
+    meta.setRange(0, 1);
   };
 
   readonly instrument: string;
@@ -644,7 +652,7 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
   percentChange(name: string, indicator: string): this;
   percentChange(nameOrIndicator: string, indicator?: string): this {
     if (indicator == null) {
-      return this.percentChange(InstrumentGroupRTIndicator.PREFIX_RATE_CHANGE + nameOrIndicator, nameOrIndicator);
+      return this.percentChange(InstrumentGroupRTIndicator.PREFIX_PERCENT_CHANGE + nameOrIndicator, nameOrIndicator);
     }
     return this.rateChange(nameOrIndicator, indicator, true);
   }
@@ -898,6 +906,56 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
     return this.add(name, new PredicateRTIndicator(this.indicators.getReadOnlyExisting(indicator), predicate));
   }
 
+  // The conditions: 1 while it holds and 0 while it does not, to be read as a flag with isValue(name)
+  // or composed with the other indicators. equal(name, ind, c) and its kin above are filters, which
+  // keep the last value that passed; these are their boolean twins.
+
+  /** 1 while `indicator` equals `coefficient`, 0 otherwise. */
+  isEqual(name: string, indicator: string, coefficient: number): this {
+    return this.condition(name, indicator, predicates.equal(coefficient));
+  }
+
+  /** 1 while `indicator` differs from `coefficient`, 0 otherwise. */
+  isNotEqual(name: string, indicator: string, coefficient: number): this {
+    return this.condition(name, indicator, predicates.notEqual(coefficient));
+  }
+
+  /** 1 while `indicator` is greater than or equal to `coefficient`, 0 otherwise. */
+  isGreatOrEqual(name: string, indicator: string, coefficient: number): this {
+    return this.condition(name, indicator, predicates.greaterOrEqual(coefficient));
+  }
+
+  /** 1 while `indicator` is greater than `coefficient`, 0 otherwise. */
+  isGreatThan(name: string, indicator: string, coefficient: number): this {
+    return this.condition(name, indicator, predicates.greaterThan(coefficient));
+  }
+
+  /** 1 while `indicator` is less than or equal to `coefficient`, 0 otherwise. */
+  isLessOrEqual(name: string, indicator: string, coefficient: number): this {
+    return this.condition(name, indicator, predicates.lessOrEqual(coefficient));
+  }
+
+  /** 1 while `indicator` is less than `coefficient`, 0 otherwise. */
+  isLessThan(name: string, indicator: string, coefficient: number): this {
+    return this.condition(name, indicator, predicates.lessThan(coefficient));
+  }
+
+  /** 1 while `condition` holds for the value of `indicator`, 0 otherwise. */
+  isTrue(name: string, indicator: string, condition: (value: number) => boolean): this {
+    return this.condition(name, indicator, condition);
+  }
+
+  private condition(name: string, indicator: string, condition: (value: number) => boolean): this {
+    return this.add(
+      name,
+      new ConditionRTIndicator(this.indicators.getReadOnlyExisting(indicator), condition)
+        .withMeta(IndicatorMeta.ID, ConditionRTIndicator.ID)
+        .withMeta(IndicatorMeta.SOURCE, indicator)
+        .withMeta(InstrumentGroupRTIndicator.ZERO_TO_ONE)
+        .withDisplayHint(DisplayHint.NUMBER),
+    );
+  }
+
   /** Counts the consecutive updates for which `predicate` holds; the entry's value stays the source's. */
   periodCount(name: string, indicator: string, predicate: (value: number) => boolean): this {
     return this.add(
@@ -1108,6 +1166,24 @@ export class InstrumentGroupRTIndicator extends AbstractRTIndicator {
 
   getIndicatorValue(name: string): number {
     return this.indicators.getIndicatorValue(name);
+  }
+
+  /**
+   * Reads an indicator as a condition: `true` when it is ready and its value is not zero. It is the
+   * reader of the conditions (`isLessThan`, `isTrue`, ...), which give 1 or 0, and it works on any
+   * indicator, where a non-zero number counts as true. An indicator that is not ready yet reads
+   * `false`, so a rule written on it does not act on a warm-up value.
+   *
+   * @param name the registered name
+   * @throws Error if nothing is registered under the name
+   */
+  isValue(name: string): boolean {
+    const indicator = this.indicators.getExisting(name);
+    if (!indicator.isReady()) {
+      return false;
+    }
+    const value = indicator.getValue();
+    return value !== 0 && !Number.isNaN(value);
   }
 
   getReadOnlyExisting(name: string): RTIndicator {

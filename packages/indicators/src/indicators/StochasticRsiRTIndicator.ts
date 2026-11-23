@@ -40,6 +40,14 @@ export class StochasticRsiRTIndicator extends AbstractDecorableIncrementalRTIndi
   }
 
   /**
+   * Ready when the window of RSI values it ranks the RSI in is full of valid ones: the RSI needs its
+   * own warm-up, and the window then needs `periods` values of it.
+   */
+  override isReady(): boolean {
+    return super.isReady() && this.maxRsi.isReady() && this.minRsi.isReady();
+  }
+
+  /**
    * `newValue` is the RSI of this tick: the decorated chain runs the wrapped RSI before this is
    * reached, so reading `getValue()` here would read this indicator's own previous output. A flat
    * RSI range gives 0. The result is held to [0, 100]: an RSI at an extreme of its own window can
@@ -47,6 +55,11 @@ export class StochasticRsiRTIndicator extends AbstractDecorableIncrementalRTIndi
    */
   protected override nextValue(_prevValue: number, newValue: number): number {
     const rsi = newValue;
+    if (!this.getIndicator<RTIndicator>().isReady()) {
+      // An RSI that is warming up says 0 and not an RSI: it does not go into the window it is
+      // ranked in, where it would stay for as many updates as the window is long.
+      return 0;
+    }
     const max = this.maxRsi.update(rsi);
     const min = this.minRsi.update(rsi);
     const num = rsi - min;

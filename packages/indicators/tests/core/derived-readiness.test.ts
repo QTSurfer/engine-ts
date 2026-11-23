@@ -62,7 +62,8 @@ const derivedFromOneSource: [string, (source: RTIndicator) => RTIndicator][] = [
   ["ema", (source) => new EmaRTIndicator(2, source)],
   ["mma", (source) => new MmaRTIndicator(2, source)],
   ["rsi", (source) => new RsiRTIndicator(2, source)],
-  ["stochasticRsi", (source) => new StochasticRsiRTIndicator(2, source)],
+  // stochasticRsi is not here: it ranks the RSI in a window of its values, which only start when the
+  // RSI is ready, so it is ready one window after its source (see stoch-rsi-warm-up.test.ts)
   ["variance", (source) => new VarianceRTIndicator(source, 2)],
   ["standardDeviation", (source) => new StandardDeviationRTIndicator(source, 2)],
   ["bollinger", (source) => new BollingerBandsRTIndicator(source, 2, 2)],

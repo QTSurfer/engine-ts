@@ -55,7 +55,24 @@ export abstract class AbstractDecorableIncrementalRTIndicator extends AbstractIn
     if (this._indicator == null) {
       return super.update(newValue);
     }
-    return super.update(this._indicator.update(newValue));
+    const value = this._indicator.update(newValue);
+    if (!this.consumes(this._indicator)) {
+      return this.getValue();
+    }
+    return super.update(value);
+  }
+
+  /**
+   * Whether the value the decorated indicator has just produced is fed into this indicator. Always,
+   * by default. An accumulator whose first value seeds everything after it (a running minimum or
+   * maximum) overrides it to wait for the decorated indicator to be ready, so the warm-up values of
+   * its source never enter it. While it holds back, this indicator keeps the value it had.
+   *
+   * @param decorated the decorated indicator, after it processed the new value
+   * @returns `true` to feed its value into this indicator
+   */
+  protected consumes(_decorated: RTIndicator): boolean {
+    return true;
   }
 
   protected override nextValue(_prevValue: number, newValue: number): number {

@@ -89,7 +89,7 @@ describe("the info signal", () => {
     const info = infoOf(strategy, makeTicker(100, 1000));
 
     expect([...info.properties.keys()].sort()).toEqual(
-      ["chg", "chgprice", "price", "rsi2", "volAsk", "volBid", "vwap"].sort(),
+      ["chg", "pchgprice", "price", "rsi2", "volAsk", "volBid", "vwap"].sort(),
     );
   });
 

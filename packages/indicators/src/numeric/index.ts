@@ -5,6 +5,7 @@ export { SumRTIndicator } from "./SumRTIndicator";
 export { RoundRTIndicator } from "./RoundRTIndicator";
 export { TransformRTIndicator } from "./TransformRTIndicator";
 export { PredicateRTIndicator } from "./PredicateRTIndicator";
+export { ConditionRTIndicator } from "./ConditionRTIndicator";
 export { BiFunctionRTIndicator } from "./BiFunctionRTIndicator";
 export { ClampRTIndicator } from "./ClampRTIndicator";
 export { ClampPredicateRTIndicator } from "./ClampPredicateRTIndicator";

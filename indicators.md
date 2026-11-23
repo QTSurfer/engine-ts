@@ -67,7 +67,7 @@ Update the row in the same change that adds a class or a builder method:
 | Indicator | Class | Builder | Bars | Notes |
 |---|---|---|---|---|
 | Distance | `DistanceRTIndicator` | `distance` |  | `(a - b) / b` |
-| Distance from MA | `DistanceFromMaRTIndicator` | `distanceMa` |  | `(close - ma) / ma` |
+| Distance from MA | `DistanceFromMaRTIndicator` | `distanceMa` |  | `(close - ma) / ma`; the average is any of `sma`, `ema`, `mma`, `wma`, `wmaIncremental`, `hma`, `tema`, `kama`, also through a read-only view; anything else is refused |
 | Rate of change | `RateChangeRTIndicator` | `rateChange`, `percentChange` |  |  |
 | % Change over a period | `PercentChangePeriodRTIndicator` | — |  |  |
 
@@ -91,6 +91,7 @@ Registered by the builder from other indicators; these are not indicators of a p
 | `BiFunctionRTIndicator` | `fun` | combines two indicators through a binary function |
 | `ConditionalRTIndicator` | `conditional` | feeds a value to a `then` indicator when a predicate holds, or to an `else` one |
 | `PredicateRTIndicator` | `predicate` | accepts the output while a predicate holds and keeps the last accepted one |
+| `ConditionRTIndicator` | `isEqual`, `isNotEqual`, `isGreatThan`, `isGreatOrEqual`, `isLessThan`, `isLessOrEqual`, `isTrue` | 1 while a condition holds for the source, 0 while it does not; read as a flag with `isValue(name)` |
 | `PredicatePeriodCounterRTIndicator` | `periodCount` | counts consecutive periods where a predicate holds |
 | `ClampRTIndicator` | `clamp` | clamps the output to a range |
 | `ClampPredicateRTIndicator` | `clamp` | replaces the output with a fixed value when a predicate matches |
