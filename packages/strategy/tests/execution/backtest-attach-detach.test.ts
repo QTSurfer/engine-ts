@@ -6,6 +6,7 @@ import { AbstractTickerStrategy } from "../../src/AbstractTickerStrategy";
 import { BuySignal } from "../../src/event/signal/BuySignal";
 import { InfoStrategySignal } from "../../src/event/signal/InfoStrategySignal";
 import { SellSignal } from "../../src/event/signal/SellSignal";
+import { SystemSignal } from "../../src/event/signal/SystemSignal";
 import type { StrategySignal } from "../../src/event/signal/StrategySignal";
 import type { BacktestConfig } from "../../src/execution/BacktestConfig";
 import { BacktestRunner, type BacktestResult } from "../../src/execution/BacktestRunner";
@@ -159,6 +160,26 @@ class BareHookedTickerStrategy extends BareTickerStrategy {
   override onAttach(_context: StrategyContext): void {}
 
   override onDetach(_context: StrategyContext): void {}
+}
+
+/** Asks to detach from both hooks and from `update`, the way a script does. */
+class DetachingTickerStrategy extends PlainTickerStrategy {
+  detachFromUpdateAt = 0;
+
+  override onAttach(context: StrategyContext): void {
+    this.detach(context);
+  }
+
+  override update(ticker: Ticker): void {
+    super.update(ticker);
+    if (this.seen === this.detachFromUpdateAt) {
+      this.detach(ticker.instrument);
+    }
+  }
+
+  override onDetach(context: StrategyContext): void {
+    this.detach(context);
+  }
 }
 
 // --- Bar strategies --------------------------------------------------------------------------
@@ -566,5 +587,53 @@ describe("the hooks change nothing else", () => {
     expect(withoutHooks.yields.every((y) => y.timestamp === 0)).toBe(true);
     expect(withHooks).toEqual(withoutHooks);
     expect(hooked.lastEventTimestamp).toBe(0);
+  });
+});
+
+// --- A strategy that asks to detach ----------------------------------------------------------
+
+describe("a strategy that asks to detach", () => {
+  /**
+   * The request is a signal for the platform that hosts the run. A backtest has no source to
+   * detach before its data ends, so it goes on to the last point and the result is the one the
+   * strategy would have without asking.
+   */
+  it("goes through the run as a system signal and does not change the result", () => {
+    const asking = new DetachingTickerStrategy();
+    asking.buyAt = 2;
+    asking.sellAt = 4;
+    asking.detachFromUpdateAt = 3;
+    const quiet = new PlainTickerStrategy();
+    quiet.buyAt = 2;
+    quiet.sellAt = 4;
+    const signals: StrategySignal[] = [];
+    asking.onSignal((signal) => signals.push(signal));
+
+    const withRequests = BacktestRunner.run(asking, risingTickers(), NO_FEES);
+    const withoutRequests = BacktestRunner.run(quiet, risingTickers(), NO_FEES);
+
+    expect(withRequests.yields).toEqual(withoutRequests.yields);
+    expect(withRequests.finalEquity).toBe(withoutRequests.finalEquity);
+    expect(asking.seen).toBe(5);
+    const requests = signals.filter((signal): signal is SystemSignal => signal instanceof SystemSignal);
+    // from onAttach (named by the attachment), from the third update, and from onDetach
+    expect(requests).toHaveLength(3);
+    expect(requests.map((request) => request.getEventTypeValue())).toEqual(["DETACH", "DETACH", "DETACH"]);
+    // A backtest that finds its instruments in the data attaches with none, and onDetach gets that
+    // same attachment, so the two requests from the hooks are about the exchange and the segment;
+    // the one from update is about the instrument it was given.
+    expect(requests.map((request) => request.instrument)).toEqual(["backtest/spot", BTC, "backtest/spot"]);
+    expect(requests.map((request) => request.getAttachment() !== undefined)).toEqual([true, false, true]);
+  });
+
+  it("an attach that was asked to detach stamps the request with the first tick's time", () => {
+    const strategy = new DetachingTickerStrategy();
+    const signals: StrategySignal[] = [];
+    strategy.onSignal((signal) => signals.push(signal));
+
+    BacktestRunner.run(strategy, risingTickers(), NO_FEES);
+
+    const stamps = signals.filter((signal) => signal instanceof SystemSignal).map((signal) => signal.timestamp);
+    expect(stamps).toEqual([T0, T0 + 4 * MINUTE]);
   });
 });

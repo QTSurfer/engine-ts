@@ -9,6 +9,8 @@ import { AbstractStrategyEvent } from "$event/AbstractStrategyEvent";
 import { BuySignal } from "$signal/BuySignal";
 import { SellSignal } from "$signal/SellSignal";
 import { InfoStrategySignal } from "$signal/InfoStrategySignal";
+import { SystemSignal } from "$signal/SystemSignal";
+import type { StrategyContext } from "./StrategyContext";
 import type { StrategySignal } from "$signal/StrategySignal";
 
 /**
@@ -129,6 +131,49 @@ export abstract class AbstractSubscriptionStrategy<T> extends AbstractStrategy {
     const signal = new InfoStrategySignal(this.name, instrument);
     if (key !== undefined) signal.set(key, ...values);
     this.emitSignal(signal);
+  }
+
+  // --- Detach ---
+
+  private sourceDetaching = false;
+
+  /**
+   * Called by the host around `onDetach`: while it is set, `detach(...)` emits nothing, because
+   * the source it could ask to detach is already going. A strategy may call `detach(...)` from
+   * `onDetach`; the call is allowed and does nothing.
+   */
+  setSourceDetaching(detaching: boolean): void {
+    this.sourceDetaching = detaching;
+  }
+
+  /**
+   * Asks the platform to detach a source, with a system signal whose action is `DETACH`. The
+   * platform applies it at the next event of its stream, so the strategy goes on receiving events
+   * of that source until then. A host that has no sources to detach (a backtest of one source ends
+   * with it) does what its own contract says.
+   *
+   * - `detach(instrument)`: the source that reads this instrument.
+   * - `detach(context)`, for use from `onAttach` and `onDetach`: the attachment the context
+   *   describes. The signal names the attachment by its id, so a source that reads several
+   *   instruments is still the one detached, and it is about the first instrument of the context.
+   *   A live attachment is made with an instrument, so the platform always passes at least one;
+   *   only a context built with none (a backtest of a strategy that finds its instruments in the
+   *   data) falls back to the exchange and the segment, as an instrument, because a signal has to
+   *   be about one.
+   */
+  protected detach(target: string | StrategyContext): void {
+    if (this.sourceDetaching) {
+      return;
+    }
+    if (typeof target === "string") {
+      this.emitSignal(SystemSignal.detach(this.name, target));
+      return;
+    }
+    const about =
+      target.getInstrumentCount() > 0
+        ? target.getInstrument(0)
+        : Instrument.of(target.getExchange(), target.getSegment()).symbol();
+    this.emitSignal(SystemSignal.detach(this.name, about).attachment(target.getId()));
   }
 
   // Crossover detection is a standalone helper, not a method here: see CrossDetector. The old
