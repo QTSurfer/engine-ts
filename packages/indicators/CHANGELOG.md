@@ -1,5 +1,12 @@
 # @qtsurfer/indicators
 
+## 0.18.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @qtsurfer/core@0.18.0
+
 ## 0.17.0
 
 ### Minor Changes
