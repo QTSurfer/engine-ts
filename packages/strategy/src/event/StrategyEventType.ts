@@ -9,4 +9,6 @@ export enum StrategyEventType {
   Yield = "Yield",
   Command = "Command",
   Request = "Request",
+  /** The strategy tells the platform about its own run (for example, to detach a source). */
+  System = "System",
 }

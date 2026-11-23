@@ -128,7 +128,7 @@ packages/
   - vitest bench suite comparing throughput: RT native vs trading-signals
   - Run: `pnpm --filter @qtsurfer/indicators-trading-signals test` / `bench`
 
-- **@qtsurfer/strategy** — Strategy framework: signal hierarchy, the strategy classes (`AbstractStrategy`, `AbstractTickerStrategy`, `AbstractKlineStrategy`), the `onAttach` / `onDetach` hooks and their `StrategyContext`, the backtest execution pipeline with its simulation layer, yield metrics. Also holds the cross-engine conformance suite (`tests/conformance/`)
+- **@qtsurfer/strategy** — Strategy framework: signal hierarchy, the strategy classes (`AbstractStrategy`, `AbstractTickerStrategy`, `AbstractKlineStrategy`), the `onAttach` / `onDetach` hooks and their `StrategyContext`, `detach(...)` and its `SystemSignal`, the backtest execution pipeline with its simulation layer, yield metrics. Also holds the cross-engine conformance suite (`tests/conformance/`)
 
 ## Architecture
 

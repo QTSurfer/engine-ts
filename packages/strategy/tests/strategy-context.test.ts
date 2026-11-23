@@ -18,6 +18,7 @@ const REASONS = [
   StrategyContext.REASON_POOL_GONE,
   StrategyContext.REASON_CAPACITY,
   StrategyContext.REASON_FUNDS,
+  StrategyContext.REASON_STRATEGY,
 ];
 
 function valid() {
@@ -244,6 +245,7 @@ describe("StrategyContext", () => {
     expect(StrategyContext.REASON_POOL_GONE).toBe("POOL_GONE");
     expect(StrategyContext.REASON_CAPACITY).toBe("CAPACITY");
     expect(StrategyContext.REASON_FUNDS).toBe("FUNDS");
+    expect(StrategyContext.REASON_STRATEGY).toBe("STRATEGY");
   });
 
   it("every reason constant is accepted", () => {

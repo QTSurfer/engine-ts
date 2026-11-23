@@ -2,7 +2,14 @@ import type { Instrument } from "@qtsurfer/core";
 import { MarketDataSource, VenueType } from "@qtsurfer/core";
 
 /** The text the engine accepts as a detach reason, besides the empty string. */
-const REASONS: readonly string[] = ["OWNER", "REFUSED", "POOL_GONE", "CAPACITY", "FUNDS"];
+const REASONS: readonly string[] = [
+  "OWNER",
+  "REFUSED",
+  "POOL_GONE",
+  "CAPACITY",
+  "FUNDS",
+  "STRATEGY",
+];
 
 /** What a context holds, already checked: the one argument of its constructor. */
 interface ContextFields {
@@ -63,6 +70,8 @@ export class StrategyContext {
   static readonly REASON_CAPACITY = "CAPACITY";
   /** Detach reason: the attachment ended because of the funds available to it. */
   static readonly REASON_FUNDS = "FUNDS";
+  /** Detach reason: the strategy itself ended the attachment, with `detach(...)`. */
+  static readonly REASON_STRATEGY = "STRATEGY";
 
   static {
     create = (fields) => new StrategyContext(fields);
