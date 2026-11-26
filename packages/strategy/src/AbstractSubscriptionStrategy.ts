@@ -149,8 +149,9 @@ export abstract class AbstractSubscriptionStrategy<T> extends AbstractStrategy {
   /**
    * Asks the platform to detach a source, with a system signal whose action is `DETACH`. The
    * platform applies it at the next event of its stream, so the strategy goes on receiving events
-   * of that source until then. A host that has no sources to detach (a backtest of one source ends
-   * with it) does what its own contract says.
+   * of that source until then. A backtest stops reading the instrument from its next data point,
+   * for the strategy and the simulated venue alike, and ends when the strategy has detached every
+   * instrument of its data.
    *
    * - `detach(instrument)`: the source that reads this instrument.
    * - `detach(context)`, for use from `onAttach` and `onDetach`: the attachment the context
@@ -159,7 +160,8 @@ export abstract class AbstractSubscriptionStrategy<T> extends AbstractStrategy {
    *   A live attachment is made with an instrument, so the platform always passes at least one;
    *   only a context built with none (a backtest of a strategy that finds its instruments in the
    *   data) falls back to the exchange and the segment, as an instrument, because a signal has to
-   *   be about one.
+   *   be about one. A backtest has one attachment, so detaching it ends the run at its next data
+   *   point.
    */
   protected detach(target: string | StrategyContext): void {
     if (this.sourceDetaching) {
