@@ -95,7 +95,7 @@ class Dca extends AbstractTickerStrategy {
 }
 ```
 
-`setPercentGain` takes 0 to 100 and `setMinGain` a non-negative number; anything else throws. The strategy only stores them (`getMinPercentGainMultiplier()` gives the percent as a fraction): reading them is up to the strategy. The backtest pipeline runs LONG only, so `setExecutionMode` and `setMultiEntryEnabled` are stored but do not change how it simulates. `getEngineVersion()`, `getEngineVersionMajor()` and `getEngineVersionMinor()` report the version of this package.
+`setPercentGain` takes 0 to 100 and `setMinGain` a non-negative number; anything else throws. The strategy only stores them (`getMinPercentGainMultiplier()` gives the percent as a fraction): reading them is up to the strategy. A backtest simulates `LONG` (one entry, a sell closes the position) and `LONG_MULTI` (see [Scaling in](#scaling-in)); `SHORT` is stored and simulated as `LONG`. `getEngineVersion()`, `getEngineVersionMajor()` and `getEngineVersionMinor()` report the version of this package.
 
 ### Attach and detach hooks
 
@@ -167,10 +167,10 @@ result.session.indicators;  // [] unless recordIndicators asked for them
 ```
 
 - **`markers`**: one per `BuySignal` and `SellSignal` (`BUY @ 100`, `SELL stop @ 90`, with `orderKind`) and one `info` marker per info signal, with its key/value data as `text` and as a plain `data` object and `price` when the signal carries one. The per-tick indicator snapshot a strategy with `enableIndicatorsSignals` emits is left out. The stop a filled entry attaches (`setStopPrice`) is the pipeline's own order, so it has no marker; its fill is in `fills`.
-- **`markers[].ignored`**: a marker marks what the strategy *emitted*, and the emulator does not act on every signal: a sell while no position is open, a second buy while one is, a buy with no funds left. The marker of a signal the pipeline dropped without a fill carries `ignored: { reason }`; every other marker has no `ignored` key. The `reason` (type `IgnoredReason`) is `already-long` (a buy while a position is open), `no-position` (a sell with nothing to sell), `no-funds` (a buy with no balance), `zero-size` (a buy or a sell that works out to nothing, `buyPercent` or `sellPercent` at 0), `invalid-order` (a trailing stop with neither a percent nor a distance above zero) or `cancelled` (a queued `stop` order of the strategy, removed when the position closed). A queued order (limit, stop, a market order the fill policy defers) is flagged when it resolves into one of those states, not when it is sent; one still queued when the run ends is not flagged. Info markers are never flagged. To draw what the emulator did, leave out the flagged markers: the buy and sell markers that remain match the fills one to one, except the exit fills of the protective stops an entry attached, which have no marker.
+- **`markers[].ignored`**: a marker marks what the strategy *emitted*, and the emulator does not act on every signal: a sell while no position is open, a second buy while one is, a buy with no funds left. The marker of a signal the pipeline dropped without a fill carries `ignored: { reason }`; every other marker has no `ignored` key. The `reason` (type `IgnoredReason`) is `already-long` (a buy while a position is open, in `LONG`: in `LONG_MULTI` it adds to it), `no-position` (a sell with nothing to sell), `no-funds` (a buy with no balance left), `zero-size` (a buy or a sell that works out to nothing, `buyPercent` or `sellPercent` at 0), `invalid-order` (a trailing stop with neither a percent nor a distance above zero) or `cancelled` (a queued `stop` order of the strategy, removed when the position closed). A queued order (limit, stop, a market order the fill policy defers) is flagged when it resolves into one of those states, not when it is sent; one still queued when the run ends is not flagged. Info markers are never flagged. To draw what the emulator did, leave out the flagged markers: the buy and sell markers that remain match the fills one to one, except the exit fills of the protective stops an entry attached, which have no marker.
 - **`equity`**: the first point is at the time of the first data point replayed, at `initialFunding`; then one point per closed trade, at the time of that trade's exit fill (so the times only move forward), at `initialFunding` plus the cumulative PnL. No data gives `[]`. `result.metrics.equityCurve` is unchanged, and `result.metrics.equityPoints` holds the same running equity with the timestamps, without the first point.
 - **`fills`**: `timestamp` is the data time of the point the fill resolved on, so a limit order that waited shows the time it filled, not the time it was sent. `fee` is in `feeAsset`: the base asset for a buy under `FeeLeg.RECEIVED`, the quote currency otherwise. `orderKind` is the kind of the order that filled: `market`, `limit`, `stop` or `stopTrailing`, a protective stop included.
-- **`trades`**: built from the entry fill, the exit fill and the yield. A partial sell gives one trade per sell, each on its share of the entry.
+- **`trades`**: built from the entry fills, the exit fills and the yield: one trade per closed position, however many entries and sells it had (see [Scaling in](#scaling-in)).
 - **`indicators`**: with `recordIndicators: true` each public indicator of each instrument is sampled after every data point of that instrument; `['ema9', 'rsi14']` keeps only the named ones. A series has `instrument`, `name`, `id` (the indicator type), `display` (`ABSOLUTE`, `PERCENT` or `VOLUME`), the `timestamps` of the instrument (shared by its series) and the `values`, `null` while the indicator is not ready. Hidden indicators (windows and `_` helpers) are not recorded. Recording reads the indicators and changes no computed value. `runKlines` takes the same options.
 
 To follow fills as they happen, give the pipeline an `onFill(fill)` in its callback (see below), and an `onIgnored(signal, reason)` to hear of the signals it drops; both are optional.
@@ -229,12 +229,12 @@ strategy.setProperty("ema.fast", "14"); // true: converted to 14 and written to 
 
 ## Backtest Execution Model
 
-The `BacktestExecutionPipeline` implements a synchronous LONG-only state machine:
+The `BacktestExecutionPipeline` implements a synchronous LONG state machine (in `LONG_MULTI` a buy while `EXECUTING` adds an entry instead, see [Scaling in](#scaling-in)):
 
 | State | On BuySignal | On SellSignal |
 |-------|-------------|---------------|
 | `IDLE` | Enter position at signal price → `EXECUTING` | Ignored |
-| `EXECUTING` | Ignored | Unwind (full or partial), emit yield → `EXECUTING` / `IDLE` |
+| `EXECUTING` | Ignored (`LONG_MULTI`: adds an entry) | Unwind (`LONG_MULTI`: a share of the position), emit the yield when the position closes → `EXECUTING` / `IDLE` |
 
 With the legacy config shape (`initialFunding`, `feeRate`, `currency`), the pipeline fills immediately at `signal.price`, spends 100% of the balance on buy, closes 100% of the position on sell, and charges `grossAmount * feeRate` on sell only.
 
@@ -248,7 +248,7 @@ Every extra field on `BacktestConfig` is optional; omitting them preserves the l
 | `feeRateSell` | Overrides `feeRate` for the sell side. | `feeRate` |
 | `slippageBps` | Adverse price slippage in basis points. Buy fills at `price * (1 + bps/10000)`; sell fills at `price * (1 - bps/10000)`. | `0` |
 | `buyPercent` | Fraction (0–100) of available balance spent per buy signal. Residual cash stays in `balance`. | `100` |
-| `signal.sellPercent` *(per-signal, not config)* | Fraction (0–100) of the open position to unwind on a sell signal. When < 100 the pipeline stays `EXECUTING` with a proportionally reduced `enterResult` until the base amount is fully closed. Set via `new SellSignal(...).setSellPercent(50)`. | `100` |
+| `signal.sellPercent` *(per-signal, not config)* | Fraction (0–100) of the open position to unwind on a sell signal, in `LONG_MULTI` only (`LONG` sells it all). When < 100 the position stays open with what is left of it, and the yield comes with the sell that closes it. Set via `new SellSignal(...).setSellPercent(50)`. | `100` |
 
 ```ts
 const result = BacktestRunner.run(strategy, tickers, {
@@ -261,7 +261,24 @@ const result = BacktestRunner.run(strategy, tickers, {
 });
 ```
 
-The yield emitted on a partial sell prorates the cost basis: `input = enterResult.counterAmount * sellFraction`, `output = grossAmount - sellFee`. Each partial fill produces its own `StrategyYield` so metrics (win rate, Sharpe, drawdown) stay coherent across scale-outs.
+### Scaling in
+
+A strategy that calls `setMultiEntryEnabled(true)` (or `setExecutionMode(ExecutionMode.LONG_MULTI)`) can build a position in steps, as the Java engine's multi-entry pipeline does:
+
+- **Every buy while long adds an entry** to the one position, instead of being dropped as `already-long`. The first entry spends `buyPercent` of the cash; each further one spends `buyPercent` of the funds the run has (the initial funding plus what the positions closed so far made, which is how the Java engine sizes a backtest's entries), and never more than the entries of the open position have not locked (the funds less what they cost, fees included). What a partial sell brings back is not funds again until the position closes. With `buyPercent: 25` every entry is a quarter of the funds, and a share of 100 spends everything that is left. A buy with nothing left is dropped as `no-funds`.
+- **A sell sells `sellPercent` percent of what the position holds** (100 by default, which closes it; 0 is dropped as `zero-size`). A partial sell leaves the rest open, with its stops.
+- **The protective stop** an entry asks for with `setStopPrice` is re-placed for the whole position when a later entry asks for one; a later entry that asks for none leaves the stop that is there covering all of it.
+- **One yield, one trade, when the position closes**: what every sell brought in less what every entry cost. In `session.trades` the trade enters at the average price of its entries, at the time of the first one, and leaves at the average price of its exits, at the time of the last; `baseAmount` is the total sold. The fills of every entry and exit are all in `session.fills`.
+
+```ts
+class Staged extends AbstractTickerStrategy {
+  constructor() {
+    super("Staged");
+    this.setMultiEntryEnabled(true);
+  }
+  // buy A and B as the setup confirms, then sell half and, later, the rest
+}
+```
 
 ### Pluggable simulation models
 
@@ -401,7 +418,7 @@ class BreakoutWithStopLoss extends AbstractTickerStrategy {
 
 ### Risk management patterns
 
-The pipeline's single-position LONG state machine composes naturally with the order kinds. A few recipes you will reach for often:
+The pipeline's single-position state machine composes naturally with the order kinds. A few recipes you will reach for often (the scale-outs with `setSellPercent` sell that share only in `LONG_MULTI`; in `LONG` a sell closes the whole position):
 
 **Market entry with a hard stop-loss and fixed take-profit.** The static stop caps worst-case loss; the limit scale-out harvests half of the position on a rally.
 

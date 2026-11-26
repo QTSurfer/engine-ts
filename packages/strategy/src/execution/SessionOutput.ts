@@ -29,10 +29,10 @@ export interface IndicatorSeries {
 
 /**
  * Why the execution pipeline dropped a buy or sell signal without a fill:
- *  - `already-long`: a buy while a position is open.
+ *  - `already-long`: a buy while a position is open, in `LONG`. In `LONG_MULTI` a buy adds to the position.
  *  - `no-position`: a sell while no position is open.
  *  - `no-funds`: a buy with no balance left.
- *  - `zero-size`: a buy that works out to nothing (`buyPercent` at 0).
+ *  - `zero-size`: a buy or a sell that works out to nothing (`buyPercent` or `sellPercent` at 0).
  *  - `invalid-order`: an order the pipeline cannot work (a trailing stop with no distance to trail by).
  *  - `cancelled`: a queued `stop` order the strategy sent, removed when its instrument's position closed.
  */
