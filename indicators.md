@@ -30,7 +30,7 @@ Update the row in the same change that adds a class or a builder method:
 | EMA | `EmaRTIndicator` | `ema` |  |  |
 | WMA | `WmaRTIndicator` | — |  | O(window) per update; `wma` registers the incremental form below |
 | WMA, incremental | `WmaIncrementalRTIndicator` | `wma` |  | O(1) per update |
-| TEMA | `TemaRTIndicator` | `tema` |  |  |
+| TEMA | `TemaRTIndicator` | `tema` |  | Ready at update `3 * (periods - 1) + 1`, counting finite updates; a price that is not finite is ignored |
 | HMA | `HmaRTIndicator` | `hma` |  |  |
 | KAMA | `KamaRTIndicator` | `kama` |  | efficiency ratio, fast and slow periods |
 | MMA (Wilder's smoothing) | `MmaRTIndicator` | `mma` |  |  |
