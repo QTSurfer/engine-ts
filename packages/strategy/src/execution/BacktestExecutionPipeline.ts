@@ -54,7 +54,9 @@ interface TrailState {
  *  - `feeRateSell`   → override of `feeRate` for sell side
  *  - `feeLeg`        → which leg the fee lands on (default RECEIVED)
  *  - `slippageBps`   → adverse price movement applied to market fills
- *  - `buyPercent`    → fraction of balance spent per buy (default 100)
+ *  - `buyPercent`    → fraction of balance spent per buy (default 100); a buy signal's own
+ *                      `sizePercent` replaces it for that signal, and its `maxPercent` takes
+ *                      that share of what it allows
  *  - `feeModel`      → custom FeeModel (supersedes feeRate* shortcuts)
  *  - `slippageModel` → custom SlippageModel (supersedes slippageBps)
  *  - `fillPolicy`    → custom FillPolicy for market-order timing (defaults to ImmediateFill)
@@ -319,8 +321,12 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       return;
     }
 
-    const buyFraction = clampPercent(this.config.buyPercent ?? 100) / 100;
-    if (buyFraction <= 0) {
+    // The share of the funds the signal asks for replaces the run's, for this signal only. A share
+    // of the maximum (`maxPercent`) takes that fraction of what the run's own share allows.
+    const buyFraction = clampPercent(signal.getSizePercent() ?? this.config.buyPercent ?? 100) / 100;
+    const maxPercent = signal.getMaxPercent();
+    const ofMaximum = maxPercent === undefined ? 1 : clampPercent(maxPercent) / 100;
+    if (buyFraction <= 0 || ofMaximum <= 0) {
       this.ignore(signal, "zero-size");
       return;
     }
@@ -351,6 +357,9 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       allInCash = Math.min(funds * buyFraction, left);
     } else {
       allInCash = this.balance * buyFraction;
+    }
+    if (ofMaximum < 1) {
+      allInCash *= ofMaximum;
     }
     const allInBase = allInCash / effectivePrice;
 

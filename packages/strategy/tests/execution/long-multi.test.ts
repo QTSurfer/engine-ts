@@ -361,6 +361,161 @@ describe("a position that scales in (LONG_MULTI)", () => {
   });
 });
 
+describe("a signal that asks for its own size", () => {
+  it("each entry of a LONG_MULTI position takes the share it asks for: 10, 20, then everything left", () => {
+    const { pipeline, fills, ignored } = setUp(true); // buyPercent 100 is the run's
+
+    pipeline.handle(buy(100).setSizePercent(10)); // 10% of the 1000
+    pipeline.handle(buy(100).setSizePercent(20)); // 20% of the 1000, not of what is left
+    pipeline.handle(buy(100).setSizePercent(100)); // all the funds, which is the 700 that is left
+
+    expect(ignored).toEqual([]);
+    expect(fills.map((f) => f.baseAmount)).toEqual([1, 2, 7]);
+    expect(fills.map((f) => f.counterAmount)).toEqual([100, 200, 700]);
+    expect(pipeline.getBalance()).toBe(0);
+  });
+
+  it("replaces the run's share for that signal only", () => {
+    const { pipeline, fills } = setUp(true, { buyPercent: 50 });
+
+    pipeline.handle(buy(100).setSizePercent(10)); // 100: 1 base
+    pipeline.handle(buy(100)); // the run's 50% of the funds: 500: 5 base
+
+    expect(fills.map((f) => f.baseAmount)).toEqual([1, 5]);
+  });
+
+  it("is valid in LONG, where it sizes the one entry", () => {
+    const { pipeline, fills } = setUp(false);
+
+    pipeline.handle(buy(100).setSizePercent(25));
+
+    expect(fills.map((f) => f.baseAmount)).toEqual([2.5]);
+  });
+
+  it("a size of 0 buys nothing and leaves the cash as it was", () => {
+    const { pipeline, fills, ignored } = setUp(true);
+
+    pipeline.handle(buy(100).setSizePercent(0));
+
+    expect(ignored.map((i) => i.reason)).toEqual(["zero-size"]);
+    expect(fills).toEqual([]);
+    expect(pipeline.getBalance()).toBe(1000);
+    expect(pipeline.getStatus()).toBe(ExecutionStatus.IDLE);
+  });
+
+  it("a size of 0 on a further entry leaves the position as it was", () => {
+    const { pipeline, fills, ignored } = setUp(true, { buyPercent: 50 });
+    pipeline.handle(buy(100));
+
+    pipeline.handle(buy(100).setSizePercent(0));
+
+    expect(ignored.map((i) => i.reason)).toEqual(["zero-size"]);
+    expect(fills).toHaveLength(1);
+    expect(pipeline.getStatus()).toBe(ExecutionStatus.EXECUTING);
+  });
+
+  it("on a sell it is the share of the open position: a size of 40 sells 2 of 5", () => {
+    const { pipeline, fills } = setUp(true, { buyPercent: 50 });
+    pipeline.handle(buy(100)); // 500: 5 base
+
+    pipeline.handle(sell(100).setSizePercent(40));
+
+    expect(fills.at(-1)).toMatchObject({ side: "sell", baseAmount: 2 });
+    expect(pipeline.getStatus()).toBe(ExecutionStatus.EXECUTING);
+  });
+
+  it("setSellPercent is the same size for a sell", () => {
+    const { pipeline, fills } = setUp(true, { buyPercent: 50 });
+    pipeline.handle(buy(100));
+
+    pipeline.handle(sell(100).setSellPercent(40));
+
+    expect(fills.at(-1)).toMatchObject({ side: "sell", baseAmount: 2 });
+  });
+
+  it("a position scaled in with sizes closes into one yield", () => {
+    const { pipeline, yields } = setUp(true);
+    pipeline.handle(buy(100).setSizePercent(10)); // 100
+    pipeline.handle(buy(100).setSizePercent(20)); // 200
+
+    pipeline.handle(sell(110)); // 3 base at 110 = 330
+
+    expect(yields).toHaveLength(1);
+    expect(yields[0]?.input).toBe(300);
+    expect(yields[0]?.output).toBeCloseTo(330, 10);
+  });
+});
+
+describe("a signal that asks for a share of the most it can take", () => {
+  it("with nothing configured, 10, 20 and 100 of what is left take 100, 180 and 720", () => {
+    const { pipeline, fills, ignored } = setUp(true); // buyPercent 100: the whole cash left is the most
+
+    pipeline.handle(buy(100).setMaxPercent(10)); // 10% of the 1000
+    pipeline.handle(buy(100).setMaxPercent(20)); // 20% of the 900 that is left, not of the funds
+    pipeline.handle(buy(100).setMaxPercent(100)); // all of the 720 that is left
+
+    expect(ignored).toEqual([]);
+    expect(fills.map((f) => f.counterAmount)).toEqual([100, expect.closeTo(180, 10), expect.closeTo(720, 10)]);
+    expect(fills.map((f) => f.baseAmount)).toEqual([1, expect.closeTo(1.8, 10), expect.closeTo(7.2, 10)]);
+  });
+
+  it("the configured share of the funds is a ceiling it never passes: 10, 20 and 100 of 50% take 50, 100 and 500", () => {
+    const { pipeline, fills } = setUp(true, { buyPercent: 50 });
+
+    pipeline.handle(buy(100).setMaxPercent(10)); // 10% of 500
+    pipeline.handle(buy(100).setMaxPercent(20)); // 20% of 500: the most is 50% of the funds, whatever is left
+    pipeline.handle(buy(100).setMaxPercent(100)); // all of the 500
+
+    expect(fills.map((f) => f.baseAmount)).toEqual([0.5, 1, 5]);
+  });
+
+  it("a size in funds takes the place of the ceiling, a share of the maximum does not", () => {
+    const { pipeline, fills } = setUp(true, { buyPercent: 50 });
+
+    pipeline.handle(buy(100).setSizePercent(80)); // 80% of the funds, whatever the run is set to
+    pipeline.handle(buy(100).setMaxPercent(100)); // 50% of the funds is the most, and 200 is what is left
+
+    expect(fills.map((f) => f.counterAmount)).toEqual([800, 200]);
+  });
+
+  it("is valid in LONG, where it takes a share of the one entry's maximum", () => {
+    const { pipeline, fills } = setUp(false, { buyPercent: 50 });
+
+    pipeline.handle(buy(100).setMaxPercent(40)); // 40% of the 500
+
+    expect(fills.map((f) => f.baseAmount)).toEqual([2]);
+  });
+
+  it("a share of 0 buys nothing", () => {
+    const { pipeline, fills, ignored } = setUp(true);
+
+    pipeline.handle(buy(100).setMaxPercent(0));
+
+    expect(ignored.map((i) => i.reason)).toEqual(["zero-size"]);
+    expect(fills).toEqual([]);
+    expect(pipeline.getBalance()).toBe(1000);
+  });
+
+  it("with everything locked there is nothing to take a share of: no-funds", () => {
+    const { pipeline, ignored } = setUp(true);
+    pipeline.handle(buy(100).setMaxPercent(100)); // all of it
+
+    pipeline.handle(buy(100).setMaxPercent(50));
+
+    expect(ignored.map((i) => i.reason)).toEqual(["no-funds"]);
+  });
+
+  it("on a sell it is the share of the open position: 40 of 5 sells 2", () => {
+    const { pipeline, fills } = setUp(true, { buyPercent: 50 });
+    pipeline.handle(buy(100)); // 500: 5 base
+
+    pipeline.handle(sell(100).setMaxPercent(40));
+
+    expect(fills.at(-1)).toMatchObject({ side: "sell", baseAmount: 2 });
+    expect(pipeline.getStatus()).toBe(ExecutionStatus.EXECUTING);
+  });
+});
+
 describe("a position that does not scale in (LONG)", () => {
   it("a second buy while long is dropped as already-long", () => {
     const { pipeline, ignored, fills } = setUp(false, { buyPercent: 50 });
