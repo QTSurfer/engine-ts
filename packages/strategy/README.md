@@ -95,7 +95,7 @@ class Dca extends AbstractTickerStrategy {
 }
 ```
 
-`setPercentGain` takes 0 to 100 and `setMinGain` a non-negative number; anything else throws. The strategy only stores them (`getMinPercentGainMultiplier()` gives the percent as a fraction): reading them is up to the strategy. The backtest pipeline runs LONG only, so `setExecutionMode` and `setMultiEntryEnabled` are stored but do not change how it simulates. `getEngineVersion()`, `getEngineVersionMajor()` and `getEngineVersionMinor()` report the version of this package.
+`setPercentGain` takes 0 to 100 and `setMinGain` a non-negative number; anything else throws. The strategy only stores them (`getMinPercentGainMultiplier()` gives the percent as a fraction): reading them is up to the strategy. A backtest simulates `LONG` (one entry, a sell closes the position) and `LONG_MULTI` (see [Scaling in](#scaling-in)); `SHORT` is stored and simulated as `LONG`. `getEngineVersion()`, `getEngineVersionMajor()` and `getEngineVersionMinor()` report the version of this package.
 
 ### Attach and detach hooks
 
@@ -123,9 +123,9 @@ class Watcher extends AbstractTickerStrategy {
 
 Both run in order with `update`, and a signal emitted from either is handled like one from `update`. `StrategyContext` is built with `StrategyContext.builder()` and read through scalars only: `getId()`, `getVenueType()` and `getVenueTypeName()` (`"cex"` or `"dex"`), `getExchange()`, `getSegment()`, `getType()` and `getTypeName()` (`"ticker"`, `"kline"` or `"funding"`), `getInstrumentCount()`, `getInstrument(index)`, `hasInstrument(symbol)`, `isWarmingUp()` and `getReason()` (`REASON_OWNER`, `REASON_REFUSED`, `REASON_POOL_GONE`, `REASON_CAPACITY`, `REASON_FUNDS` or `REASON_STRATEGY`). `getVenueType()` and `getType()` return the `VenueType` and `MarketDataSource` enums of `@qtsurfer/core`; `instrumentList()` is the typed view of the instruments.
 
-`BacktestRunner` calls `onAttach` once before the first data point, with the id `"backtest"`, a `CEX` venue named `"backtest"`, the `"spot"` segment and the type of the run (`Ticker` for `run`, `KLine` for `runKlines`). The instruments are those the strategy holds before the run, sorted by symbol; a strategy that finds its instruments in the data has none to report yet. It calls `onDetach` once after the last data point, with the reason `OWNER`, also when an update throws (the update's error is the one the caller sees). It does not call `onDetach` if `onAttach` threw. A signal emitted from `onAttach` carries the time of the first data point, and one from `onDetach` the time of the last (for a bar, its close time).
+`BacktestRunner` calls `onAttach` once before the first data point, with the id `"backtest"`, a `CEX` venue named `"backtest"`, the `"spot"` segment and the type of the run (`Ticker` for `run`, `KLine` for `runKlines`). The instruments are those the strategy holds before the run, sorted by symbol; a strategy that finds its instruments in the data has none to report yet. It calls `onDetach` once after the last data point, with the reason `OWNER` (or `STRATEGY`, see below), also when an update throws (the update's error is the one the caller sees). It does not call `onDetach` if `onAttach` threw. A signal emitted from `onAttach` carries the time of the first data point, and one from `onDetach` the time of the last (for a bar, its close time).
 
-A strategy that has finished with a source can ask the platform to detach it, with `detach(...)` (protected, like `emitBuy`): `detach(instrument)` asks for the source that reads that instrument, and `detach(context)`, for use from `onAttach` and `onDetach`, for the attachment the context describes, named by its id. Each emits a `SystemSignal` (event type `System`, action `DETACH`, with the optional `attachment` id and `reason`). It is a signal for the platform that hosts the run, not an order: an execution pipeline ignores it, and a host that has no source to detach does nothing with it. The platform applies it at the next event of its stream, so the strategy goes on receiving events until then. A backtest has no source to detach before its data ends, so it replays to the last data point. A host calls `setSourceDetaching(true)` around `onDetach`, and while it is set `detach(...)` emits nothing, so a strategy may call it from `onDetach` safely. `StrategyContext.REASON_STRATEGY` is the detach reason for an attachment the strategy itself ended.
+A strategy that has finished with a source can ask the platform to detach it, with `detach(...)` (protected, like `emitBuy`): `detach(instrument)` asks for the source that reads that instrument (from a window listener, which is a closure of the strategy, `this.detach(indicators.instrument)` asks for the source of the listener's own instrument), and `detach(context)`, for use from `onAttach` and `onDetach`, for the attachment the context describes, named by its id. Each emits a `SystemSignal` (event type `System`, action `DETACH`, with the optional `attachment` id and `reason`). It is a signal for the platform that hosts the run, not an order: an execution pipeline ignores it, and a host that has no source to detach does nothing with it. The platform applies it at the next event of its stream, so the strategy goes on receiving events until then. A backtest applies it from the next data point: a detached instrument is read by nobody, neither the strategy nor the simulated venue (its pending orders and stops stay as they are), and is not counted in `totalTicks`, while the other instruments go on. When the strategy detaches the attachment of the run (`detach(context)`, whose id is `"backtest"`) or every instrument of the data, the run ends there, and `onDetach` is called once with the reason `STRATEGY` instead of `OWNER`; the metrics still span the whole data. A host calls `setSourceDetaching(true)` around `onDetach`, and while it is set `detach(...)` emits nothing, so a strategy may call it from `onDetach` safely. `StrategyContext.REASON_STRATEGY` is the detach reason for an attachment the strategy itself ended.
 
 ### Backtesting
 
@@ -167,10 +167,10 @@ result.session.indicators;  // [] unless recordIndicators asked for them
 ```
 
 - **`markers`**: one per `BuySignal` and `SellSignal` (`BUY @ 100`, `SELL stop @ 90`, with `orderKind`) and one `info` marker per info signal, with its key/value data as `text` and as a plain `data` object and `price` when the signal carries one. The per-tick indicator snapshot a strategy with `enableIndicatorsSignals` emits is left out. The stop a filled entry attaches (`setStopPrice`) is the pipeline's own order, so it has no marker; its fill is in `fills`.
-- **`markers[].ignored`**: a marker marks what the strategy *emitted*, and the emulator does not act on every signal: a sell while no position is open, a second buy while one is, a buy with no funds left. The marker of a signal the pipeline dropped without a fill carries `ignored: { reason }`; every other marker has no `ignored` key. The `reason` (type `IgnoredReason`) is `already-long` (a buy while a position is open), `no-position` (a sell with nothing to sell), `no-funds` (a buy with no balance), `zero-size` (a buy or a sell that works out to nothing, `buyPercent` or `sellPercent` at 0), `invalid-order` (a trailing stop with neither a percent nor a distance above zero) or `cancelled` (a queued `stop` order of the strategy, removed when the position closed). A queued order (limit, stop, a market order the fill policy defers) is flagged when it resolves into one of those states, not when it is sent; one still queued when the run ends is not flagged. Info markers are never flagged. To draw what the emulator did, leave out the flagged markers: the buy and sell markers that remain match the fills one to one, except the exit fills of the protective stops an entry attached, which have no marker.
+- **`markers[].ignored`**: a marker marks what the strategy *emitted*, and the emulator does not act on every signal: a sell while no position is open, a second buy while one is, a buy with no funds left. The marker of a signal the pipeline dropped without a fill carries `ignored: { reason }`; every other marker has no `ignored` key. The `reason` (type `IgnoredReason`) is `already-long` (a buy while a position is open, in `LONG`: in `LONG_MULTI` it adds to it), `no-position` (a sell with nothing to sell), `no-funds` (a buy with no balance left), `zero-size` (a buy or a sell that works out to nothing, `buyPercent` or `sellPercent` at 0), `invalid-order` (a trailing stop with neither a percent nor a distance above zero) or `cancelled` (a queued `stop` order of the strategy, removed when the position closed). A queued order (limit, stop, a market order the fill policy defers) is flagged when it resolves into one of those states, not when it is sent; one still queued when the run ends is not flagged. Info markers are never flagged. To draw what the emulator did, leave out the flagged markers: the buy and sell markers that remain match the fills one to one, except the exit fills of the protective stops an entry attached, which have no marker.
 - **`equity`**: the first point is at the time of the first data point replayed, at `initialFunding`; then one point per closed trade, at the time of that trade's exit fill (so the times only move forward), at `initialFunding` plus the cumulative PnL. No data gives `[]`. `result.metrics.equityCurve` is unchanged, and `result.metrics.equityPoints` holds the same running equity with the timestamps, without the first point.
 - **`fills`**: `timestamp` is the data time of the point the fill resolved on, so a limit order that waited shows the time it filled, not the time it was sent. `fee` is in `feeAsset`: the base asset for a buy under `FeeLeg.RECEIVED`, the quote currency otherwise. `orderKind` is the kind of the order that filled: `market`, `limit`, `stop` or `stopTrailing`, a protective stop included.
-- **`trades`**: built from the entry fill, the exit fill and the yield. A partial sell gives one trade per sell, each on its share of the entry.
+- **`trades`**: built from the entry fills, the exit fills and the yield: one trade per closed position, however many entries and sells it had (see [Scaling in](#scaling-in)).
 - **`indicators`**: with `recordIndicators: true` each public indicator of each instrument is sampled after every data point of that instrument; `['ema9', 'rsi14']` keeps only the named ones. A series has `instrument`, `name`, `id` (the indicator type), `display` (`ABSOLUTE`, `PERCENT` or `VOLUME`), the `timestamps` of the instrument (shared by its series) and the `values`, `null` while the indicator is not ready. Hidden indicators (windows and `_` helpers) are not recorded. Recording reads the indicators and changes no computed value. `runKlines` takes the same options.
 
 To follow fills as they happen, give the pipeline an `onFill(fill)` in its callback (see below), and an `onIgnored(signal, reason)` to hear of the signals it drops; both are optional.
@@ -229,12 +229,12 @@ strategy.setProperty("ema.fast", "14"); // true: converted to 14 and written to 
 
 ## Backtest Execution Model
 
-The `BacktestExecutionPipeline` implements a synchronous LONG-only state machine:
+The `BacktestExecutionPipeline` implements a synchronous LONG state machine (in `LONG_MULTI` a buy while `EXECUTING` adds an entry instead, see [Scaling in](#scaling-in)):
 
 | State | On BuySignal | On SellSignal |
 |-------|-------------|---------------|
 | `IDLE` | Enter position at signal price → `EXECUTING` | Ignored |
-| `EXECUTING` | Ignored | Unwind (full or partial), emit yield → `EXECUTING` / `IDLE` |
+| `EXECUTING` | Ignored (`LONG_MULTI`: adds an entry) | Unwind (`LONG_MULTI`: a share of the position), emit the yield when the position closes → `EXECUTING` / `IDLE` |
 
 With the legacy config shape (`initialFunding`, `feeRate`, `currency`), the pipeline fills immediately at `signal.price`, spends 100% of the balance on buy, closes 100% of the position on sell, and charges `grossAmount * feeRate` on sell only.
 
@@ -247,8 +247,10 @@ Every extra field on `BacktestConfig` is optional; omitting them preserves the l
 | `feeRateBuy` | Fee charged on buy as `cashToSpend * feeRateBuy`. | `0` (buys fee-free) |
 | `feeRateSell` | Overrides `feeRate` for the sell side. | `feeRate` |
 | `slippageBps` | Adverse price slippage in basis points. Buy fills at `price * (1 + bps/10000)`; sell fills at `price * (1 - bps/10000)`. | `0` |
-| `buyPercent` | Fraction (0–100) of available balance spent per buy signal. Residual cash stays in `balance`. | `100` |
-| `signal.sellPercent` *(per-signal, not config)* | Fraction (0–100) of the open position to unwind on a sell signal. When < 100 the pipeline stays `EXECUTING` with a proportionally reduced `enterResult` until the base amount is fully closed. Set via `new SellSignal(...).setSellPercent(50)`. | `100` |
+| `buyPercent` | Fraction (0–100) of available balance spent per buy signal. Residual cash stays in `balance`. A buy signal's own `sizePercent` replaces it for that signal. | `100` |
+| `signal.sizePercent` *(per-signal, not config)* | The share (0–100) of its own base a signal trades: on a buy, the percent of the funds the entry spends (see [Scaling in](#scaling-in)); on a sell, see `sellPercent`. Set via `new BuySignal(...).setSizePercent(20)`; 0 trades nothing (`zero-size`) and a value outside 0–100 throws. | none: `buyPercent` applies |
+| `signal.maxPercent` *(per-signal, not config)* | The share (0–100) of the most the signal can trade, next to `sizePercent`'s share of the funds. On a buy the most is what the run is set to spend (`buyPercent` of the funds, or all that is left unlocked at 100) and never more than what is left: 100 is that maximum, and `buyPercent` is a ceiling it never passes, where `sizePercent` takes its place. On a sell the most is the position, so it means what `sizePercent` means. 0 trades nothing; a value outside 0–100 throws. A signal has one size: `setSizePercent`, `setMaxPercent` and `setSellPercent` each take back the others. | none |
+| `signal.sellPercent` *(per-signal, not config)* | The sell side's name for `sizePercent`: it writes the same number. Fraction (0–100) of the open position to unwind on a sell signal, in `LONG_MULTI` only (`LONG` sells it all). When < 100 the position stays open with what is left of it, and the yield comes with the sell that closes it. Set via `new SellSignal(...).setSellPercent(50)`. | `100` |
 
 ```ts
 const result = BacktestRunner.run(strategy, tickers, {
@@ -261,7 +263,26 @@ const result = BacktestRunner.run(strategy, tickers, {
 });
 ```
 
-The yield emitted on a partial sell prorates the cost basis: `input = enterResult.counterAmount * sellFraction`, `output = grossAmount - sellFee`. Each partial fill produces its own `StrategyYield` so metrics (win rate, Sharpe, drawdown) stay coherent across scale-outs.
+### Scaling in
+
+A strategy that calls `setMultiEntryEnabled(true)` (or `setExecutionMode(ExecutionMode.LONG_MULTI)`) can build a position in steps, as the Java engine's multi-entry pipeline does:
+
+- **Every buy while long adds an entry** to the one position, instead of being dropped as `already-long`. The first entry spends `buyPercent` of the cash; each further one spends `buyPercent` of the funds the run has (the initial funding plus what the positions closed so far made, which is how the Java engine sizes a backtest's entries), and never more than the entries of the open position have not locked (the funds less what they cost, fees included). What a partial sell brings back is not funds again until the position closes. With `buyPercent: 25` every entry is a quarter of the funds, and a share of 100 spends everything that is left. A buy with nothing left is dropped as `no-funds`.
+- **Each buy can ask for its own size** with `setSizePercent`, which replaces `buyPercent` for that signal: `10`, then `20`, then `100` buys a tenth of the funds, a fifth, and everything that is left. A size of 0 buys nothing (`zero-size`).
+- **Or a share of the most it can take** with `setMaxPercent`: it takes that share of what the run allows an entry. With the default `buyPercent` that is all that is left unlocked, so `10`, `20`, then `100` buys a tenth of the 1000, a fifth of the 900 that is left, and all of the 720 that is left; with `buyPercent: 50` the most is half of the funds (500) whatever is left, a ceiling that a share of 100 never passes.
+- **A sell sells `sellPercent` percent of what the position holds** (100 by default, which closes it; 0 is dropped as `zero-size`). A partial sell leaves the rest open, with its stops.
+- **The protective stop** an entry asks for with `setStopPrice` is re-placed for the whole position when a later entry asks for one; a later entry that asks for none leaves the stop that is there covering all of it.
+- **One yield, one trade, when the position closes**: what every sell brought in less what every entry cost. In `session.trades` the trade enters at the average price of its entries, at the time of the first one, and leaves at the average price of its exits, at the time of the last; `baseAmount` is the total sold. The fills of every entry and exit are all in `session.fills`.
+
+```ts
+class Staged extends AbstractTickerStrategy {
+  constructor() {
+    super("Staged");
+    this.setMultiEntryEnabled(true);
+  }
+  // buy A and B as the setup confirms, then sell half and, later, the rest
+}
+```
 
 ### Pluggable simulation models
 
@@ -401,7 +422,7 @@ class BreakoutWithStopLoss extends AbstractTickerStrategy {
 
 ### Risk management patterns
 
-The pipeline's single-position LONG state machine composes naturally with the order kinds. A few recipes you will reach for often:
+The pipeline's single-position state machine composes naturally with the order kinds. A few recipes you will reach for often (the scale-outs with `setSellPercent` sell that share only in `LONG_MULTI`; in `LONG` a sell closes the whole position):
 
 **Market entry with a hard stop-loss and fixed take-profit.** The static stop caps worst-case loss; the limit scale-out harvests half of the position on a rally.
 

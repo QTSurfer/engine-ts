@@ -31,10 +31,10 @@ export class SessionRecorder {
   // when a queued order resolves) lands on that signal's own marker
   private readonly markerOf = new WeakMap<MarketHintSignal, SessionMarker>();
   private readonly indicators: IndicatorRecorder | null;
-  // A new entry only fills from idle, so the latest buy is the entry of every sell after it,
-  // partial sells included
-  private entry: Fill | null = null;
-  private exit: Fill | null = null;
+  // The fills of the position that is open: with one entry and one exit, those two; a position
+  // that scales in has several of each, and its trade is made of all of them
+  private entries: Fill[] = [];
+  private exits: Fill[] = [];
 
   constructor(options: RunOptions | undefined, findGroup: IndicatorGroupLookup) {
     this.indicators = IndicatorRecorder.create(options?.recordIndicators, findGroup);
@@ -43,29 +43,36 @@ export class SessionRecorder {
   fill(fill: Fill): void {
     this.fills.push(fill);
     if (fill.side === "buy") {
-      this.entry = fill;
+      this.entries.push(fill);
     } else {
-      this.exit = fill;
+      this.exits.push(fill);
     }
   }
 
-  /** A closed yield: the pipeline reports the exit fill that closed it just before. */
+  /**
+   * A closed yield: the pipeline reports the exit fill that closed it just before. The trade
+   * enters at the average price of its entries, at the time of the first, and leaves at the
+   * average price of its exits, at the time of the last; its base amount is what the exits sold.
+   */
   yield(strategyYield: StrategyYield): void {
-    const { entry, exit } = this;
-    this.exit = null;
-    if (entry == null || exit == null) return;
+    const { entries, exits } = this;
+    this.entries = [];
+    this.exits = [];
+    const first = entries[0];
+    const last = exits[exits.length - 1];
+    if (first === undefined || last === undefined) return;
     this.trades.push({
       instrument: strategyYield.instrument,
-      entryTime: entry.timestamp,
-      entryPrice: entry.price,
-      exitTime: exit.timestamp,
-      exitPrice: exit.price,
-      baseAmount: exit.baseAmount,
+      entryTime: first.timestamp,
+      entryPrice: averagePrice(entries),
+      exitTime: last.timestamp,
+      exitPrice: averagePrice(exits),
+      baseAmount: exits.length === 1 ? last.baseAmount : exits.reduce((sum, fill) => sum + fill.baseAmount, 0),
       input: strategyYield.input,
       output: strategyYield.output,
       pnl: strategyYield.getYield(),
       pnlPercent: strategyYield.getYieldPercent(),
-      exitKind: exit.orderKind,
+      exitKind: last.orderKind,
     });
   }
 
@@ -252,4 +259,13 @@ function formatValue(value: unknown): string {
 /** A number as text without the float noise of a computed price (0.1 + 0.2 reads 0.3). */
 function formatNumber(value: number): string {
   return Number.isFinite(value) ? String(Number(value.toPrecision(12))) : String(value);
+}
+
+/** The price a set of fills of one side traded at on average: what they paid, or got, per unit of base. */
+function averagePrice(fills: readonly Fill[]): number {
+  const [only] = fills;
+  if (fills.length === 1 && only !== undefined) return only.price;
+  const base = fills.reduce((sum, fill) => sum + fill.baseAmount, 0);
+  const counter = fills.reduce((sum, fill) => sum + fill.counterAmount, 0);
+  return counter / base;
 }

@@ -28,7 +28,8 @@ export enum OrderKind {
 export abstract class MarketHintSignal extends EventTypeValueSignal {
   static readonly KEY_FLAGS = "_flgs";
   static readonly KEY_MAX_TRIES = "_maxTries";
-  static readonly KEY_SELL_PERCENT = "_sellPct";
+  static readonly KEY_SIZE_PERCENT = "_sizePct";
+  static readonly KEY_MAX_PERCENT = "_maxPct";
   static readonly KEY_STOP_PRICE = "_stopPrice";
   static readonly KEY_STOP_LIMIT_PRICE = "_stopLimitPrice";
   static readonly KEY_TRAIL_DISTANCE = "_trailDist";
@@ -64,12 +65,65 @@ export abstract class MarketHintSignal extends EventTypeValueSignal {
     return this.get<number>(MarketHintSignal.KEY_MAX_TRIES);
   }
 
-  setSellPercent(percent: number): this {
-    return this.set(MarketHintSignal.KEY_SELL_PERCENT, percent);
+  /**
+   * The share of its own base this signal trades, 0 to 100, one number for either side: on a buy,
+   * the percent of the funds the entry spends, never more than what is left unlocked (it replaces
+   * the run's `buyPercent` for this signal only); on a sell, the percent of the open position it
+   * sells. 0 trades nothing.
+   *
+   * A signal has one size: this takes back a {@link setMaxPercent} the signal had.
+   *
+   * @throws if `percent` is not a number from 0 to 100
+   */
+  setSizePercent(percent: number): this {
+    checkPercent("sizePercent", percent);
+    return this.setSize(MarketHintSignal.KEY_SIZE_PERCENT, MarketHintSignal.KEY_MAX_PERCENT, percent);
   }
 
+  /** The share of the funds the signal asks for, or `undefined` when it asks for none. */
+  getSizePercent(): number | undefined {
+    return this.get<number>(MarketHintSignal.KEY_SIZE_PERCENT);
+  }
+
+  /**
+   * The share, 0 to 100, of the most this signal can trade, the relative size next to
+   * {@link setSizePercent}'s share of the funds. On a buy, the most is what the run is configured
+   * to spend (`buyPercent` of the funds, or all the cash that is left when it is 100) and never
+   * more than what is left unlocked: 100 is that maximum and the configured `buyPercent` is a
+   * ceiling this never passes. On a sell the most is the open position, so it means what
+   * {@link setSizePercent} means. 0 trades nothing.
+   *
+   * A signal has one size: this takes back a {@link setSizePercent} the signal had.
+   *
+   * @throws if `percent` is not a number from 0 to 100
+   */
+  setMaxPercent(percent: number): this {
+    checkPercent("maxPercent", percent);
+    return this.setSize(MarketHintSignal.KEY_MAX_PERCENT, MarketHintSignal.KEY_SIZE_PERCENT, percent);
+  }
+
+  /** The share of the maximum the signal asks for, or `undefined` when it asks for none. */
+  getMaxPercent(): number | undefined {
+    return this.get<number>(MarketHintSignal.KEY_MAX_PERCENT);
+  }
+
+  /**
+   * The sell side's name for {@link setSizePercent}: it writes the same size, takes back a
+   * {@link setMaxPercent}, and does not validate.
+   */
+  setSellPercent(percent: number): this {
+    return this.setSize(MarketHintSignal.KEY_SIZE_PERCENT, MarketHintSignal.KEY_MAX_PERCENT, percent);
+  }
+
+  /** The size of a sell: `sizePercent`, else `maxPercent`, else 100 when the signal asks for none. */
   getSellPercent(): number {
-    return this.get<number>(MarketHintSignal.KEY_SELL_PERCENT) ?? 100.0;
+    return this.getSizePercent() ?? this.getMaxPercent() ?? 100.0;
+  }
+
+  /** Writes the one size of the signal under `key`, taking back the other kind. */
+  private setSize(key: string, otherKey: string, percent: number): this {
+    this.properties.delete(otherKey);
+    return this.set(key, percent);
   }
 
   setFlags(...flags: string[]): this {
@@ -138,5 +192,11 @@ export abstract class MarketHintSignal extends EventTypeValueSignal {
     copy.timestamp = this.timestamp;
     copy.orderKind = this.orderKind;
     return copy;
+  }
+}
+
+function checkPercent(name: string, percent: number): void {
+  if (!(percent >= 0 && percent <= 100)) {
+    throw new RangeError(`${name} must be from 0 to 100, got ${percent}`);
   }
 }

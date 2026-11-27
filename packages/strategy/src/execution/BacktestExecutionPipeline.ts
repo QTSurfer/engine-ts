@@ -7,6 +7,7 @@ import type { AbstractStrategy } from "../AbstractStrategy";
 import type { BacktestConfig } from "./BacktestConfig";
 import type { ExecutionCallback } from "./ExecutionCallback";
 import { NOOP_CALLBACK } from "./ExecutionCallback";
+import { ExecutionMode } from "./ExecutionMode";
 import type { ExecutionPipeline } from "./ExecutionPipeline";
 import { ExecutionResult } from "./ExecutionResult";
 import { ExecutionStatus } from "./ExecutionStatus";
@@ -37,7 +38,7 @@ interface TrailState {
 }
 
 /**
- * Synchronous LONG-only backtest execution pipeline.
+ * Synchronous long backtest execution pipeline, one position at a time.
  * State machine: IDLE → buy signal → EXECUTING (holding position) → sell signal → emit yield → IDLE
  *
  * Default behavior: market orders fill at signal price; fees charged on BOTH sides
@@ -53,13 +54,28 @@ interface TrailState {
  *  - `feeRateSell`   → override of `feeRate` for sell side
  *  - `feeLeg`        → which leg the fee lands on (default RECEIVED)
  *  - `slippageBps`   → adverse price movement applied to market fills
- *  - `buyPercent`    → fraction of balance spent per buy (default 100)
+ *  - `buyPercent`    → fraction of balance spent per buy (default 100); a buy signal's own
+ *                      `sizePercent` replaces it for that signal, and its `maxPercent` takes
+ *                      that share of what it allows
  *  - `feeModel`      → custom FeeModel (supersedes feeRate* shortcuts)
  *  - `slippageModel` → custom SlippageModel (supersedes slippageBps)
  *  - `fillPolicy`    → custom FillPolicy for market-order timing (defaults to ImmediateFill)
  *
- * A sell closes the whole position, as the Java engine's single long pipeline does: a signal's
- * `sellPercent` is read only by Java's multi-long pipeline, which this simulation does not have.
+ * By default a position has one entry and a sell closes the whole of it, as the Java engine's single
+ * long pipeline does (`ExecutionMode.LONG`, a second buy while long is dropped as `already-long`).
+ * A strategy in `ExecutionMode.LONG_MULTI` (`setMultiEntryEnabled(true)`) scales in, as the Java
+ * engine's multi-long pipeline does:
+ *  - every buy while long adds an entry to the one position, sized from the run's funds (the
+ *    initial funding and what closed positions made, as the Java engine sizes a backtest's
+ *    entries) and never more than the entries of the open position have not spent:
+ *    `buyPercent: 10` is 10% of the funds for each entry, and a share of 100 spends all that is
+ *    left. What a partial sell brought back is not funds again until the position closes;
+ *  - a sell sells `signal.getSellPercent()` percent of what the position holds (100 by default,
+ *    which closes it, and 0 is dropped as `zero-size`);
+ *  - the protective stop an entry asks for is re-placed for the whole position, and one an entry
+ *    does not ask for keeps covering all of it;
+ *  - the yield is one, when the position is closed: what every sell brought in, less what every
+ *    entry cost.
  *
  * Order kinds (on `signal.orderKind`). Queued limit, stop and trailing orders
  * resolve against the tick's `last` price only — never its high/low, which a
@@ -112,12 +128,23 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
 
   private balance: number;
   private status = ExecutionStatus.IDLE;
-  private enterResult: ExecutionResult | null = null;
   /**
-   * Quote-denominated buy fee paid on the current entry — non-zero only under
+   * What the open position holds, as one aggregate of its entries: the sum of the base, counter and
+   * fee amounts, at their average price, less what the sells so far took off in proportion. With
+   * one entry and no partial sell it is that entry's own result.
+   */
+  private enterResult: ExecutionResult | null = null;
+  /** Counter spent on every entry of the open position, whatever has been sold since. */
+  private totalInvested = 0;
+  /** Net counter every sell of the open position has brought in so far. */
+  private totalExitProceeds = 0;
+  /** What the positions closed so far gained or lost: with the funding, the equity an entry is sized from. */
+  private realizedPnl = 0;
+  /**
+   * Quote-denominated buy fee paid on the entries of the open position — non-zero only under
    * {@link FeeLeg.QUOTE}, where the buy fee comes out of cash and so is a realized
-   * cost folded into the matching sell's output. Scaled down on partial sells in
-   * lockstep with {@link enterResult}.
+   * cost folded into the output of the sell that closes the position. Like {@link totalInvested}
+   * it is the sum over every entry, whatever has been sold since.
    */
   private enterQuoteBuyFee = 0;
   private currentTicker: Ticker | null = null;
@@ -283,7 +310,9 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
     basePrice: number,
     liquidity: Liquidity,
   ): void {
-    if (this.status !== ExecutionStatus.IDLE) {
+    // A position that is already open takes a further buy only as one more entry of it
+    const additional = this.status !== ExecutionStatus.IDLE;
+    if (additional && !this.scalesIn(signal)) {
       this.ignore(signal, "already-long");
       return;
     }
@@ -292,8 +321,12 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       return;
     }
 
-    const buyFraction = clampPercent(this.config.buyPercent ?? 100) / 100;
-    if (buyFraction <= 0) {
+    // The share of the funds the signal asks for replaces the run's, for this signal only. A share
+    // of the maximum (`maxPercent`) takes that fraction of what the run's own share allows.
+    const buyFraction = clampPercent(signal.getSizePercent() ?? this.config.buyPercent ?? 100) / 100;
+    const maxPercent = signal.getMaxPercent();
+    const ofMaximum = maxPercent === undefined ? 1 : clampPercent(maxPercent) / 100;
+    if (buyFraction <= 0 || ofMaximum <= 0) {
       this.ignore(signal, "zero-size");
       return;
     }
@@ -308,12 +341,33 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
 
     // The model returns the fee in QUOTE terms ("how much"). The pipeline then
     // routes it onto the leg `feeLeg` selects ("in which asset").
-    const allInCash = this.balance * buyFraction;
+    // A first entry takes its share of the cash. A further one takes its share of the funds the
+    // run has (the initial funding and what closed positions made, as the Java engine sizes every
+    // entry of a backtest), never more than what the open entries have not locked, so a share of
+    // 100 is all of it. The proceeds of a partial sell are no funds until the position closes.
+    let allInCash: number;
+    if (additional) {
+      const funds = this.config.initialFunding + this.realizedPnl;
+      const left = funds - (this.totalInvested + this.enterQuoteBuyFee);
+      // What is left of a float's rounding is not a position to open
+      if (left <= funds * 1e-12) {
+        this.ignore(signal, "no-funds");
+        return;
+      }
+      allInCash = Math.min(funds * buyFraction, left);
+    } else {
+      allInCash = this.balance * buyFraction;
+    }
+    if (ofMaximum < 1) {
+      allInCash *= ofMaximum;
+    }
     const allInBase = allInCash / effectivePrice;
 
     let baseGross: number;
     let cost: number;
     let feeAsset: string;
+    let entry: ExecutionResult;
+    let quoteBuyFee: number;
 
     if (this.feeLeg === FeeLeg.QUOTE) {
       // Reserve the quote buy fee out of the all-in cash at sizing so
@@ -334,8 +388,8 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       cost = baseGross * effectivePrice;
       const quoteFee = cost * buyRate;
 
-      this.enterQuoteBuyFee = quoteFee;
-      this.enterResult = new ExecutionResult(
+      quoteBuyFee = quoteFee;
+      entry = new ExecutionResult(
         effectivePrice,
         baseGross,
         cost,
@@ -361,8 +415,8 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       });
       const baseFee = quoteFee / effectivePrice;
 
-      this.enterQuoteBuyFee = 0;
-      this.enterResult = new ExecutionResult(
+      quoteBuyFee = 0;
+      entry = new ExecutionResult(
         effectivePrice,
         baseGross,
         cost,
@@ -373,8 +427,9 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       this.addFee(feeAsset, baseFee);
     }
 
+    this.addEntry(entry, quoteBuyFee);
     this.status = ExecutionStatus.EXECUTING;
-    this.callback.onFilledBuy(this.enterResult);
+    this.callback.onFilledBuy(entry);
     this.callback.onFill?.({
       instrument: signal.instrument,
       timestamp: this.fillTimestamp(signal),
@@ -382,12 +437,34 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       price: effectivePrice,
       baseAmount: baseGross,
       counterAmount: cost,
-      fee: this.enterResult.feeAmount,
+      fee: entry.feeAmount,
       feeAsset,
       liquidity,
       orderKind: signal.orderKind,
     });
     this.attachStopLoss(signal);
+  }
+
+  /** Whether this signal's instrument is run in `LONG_MULTI`: its buys add to a position, its sells may be partial. */
+  private scalesIn(signal: MarketHintSignal): boolean {
+    return this.strategy.getExecutionMode(signal.instrument) === ExecutionMode.LONG_MULTI;
+  }
+
+  /**
+   * Adds a filled entry to the open position. The first one is the position; a further one grows
+   * it, at the average price of everything bought.
+   */
+  private addEntry(entry: ExecutionResult, quoteBuyFee: number): void {
+    const held = this.enterResult;
+    if (held == null) {
+      this.enterResult = entry;
+    } else {
+      const base = held.baseAmount + entry.baseAmount;
+      const counter = held.counterAmount + entry.counterAmount;
+      this.enterResult = new ExecutionResult(counter / base, base, counter, held.feeAmount + entry.feeAmount);
+    }
+    this.totalInvested += entry.counterAmount;
+    this.enterQuoteBuyFee += quoteBuyFee;
   }
 
   /**
@@ -399,6 +476,8 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
   private attachStopLoss(entry: MarketHintSignal): void {
     const stopPrice = entry.getStopPrice();
     if (stopPrice == null) return;
+    // An entry that adds to the position re-places its stop for all of it: the old one goes
+    this.pending = this.pending.filter((p) => !this.attachedStops.has(p));
     const stop = new SellSignal(entry.strategyName, entry.instrument, stopPrice)
       .setOrderKind(OrderKind.stop);
     stop.timestamp = entry.timestamp;
@@ -436,13 +515,21 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       ticker: this.currentTicker,
     });
 
+    // A sell of a position that scales in sells its share of it; otherwise it closes it
+    const sellFraction = this.scalesIn(signal) ? clampPercent(signal.getSellPercent()) / 100 : 1;
+    if (sellFraction <= 0) {
+      this.ignore(signal, "zero-size");
+      return;
+    }
+    const closes = sellFraction >= 1;
+
     // The position holds the entry's NET base under RECEIVED (the buy fee was
     // taken from the received base) and the gross base under QUOTE.
     const positionBase =
       this.feeLeg === FeeLeg.QUOTE
         ? this.enterResult.baseAmount
         : this.enterResult.getNetBaseAmount();
-    const baseToSell = positionBase;
+    const baseToSell = closes ? positionBase : positionBase * sellFraction;
     const grossAmount = baseToSell * effectivePrice;
     // Sell fee is QUOTE-denominated on both legs.
     const feeAmount = this.feeModel.compute({
@@ -477,14 +564,31 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
       orderKind: signal.orderKind,
     });
 
-    // Yield: the entry's cost basis in, realized proceeds out. Under QUOTE the
+    this.totalExitProceeds += netAmount;
+
+    if (!closes) {
+      // The position stays open with what is left of it: the queued stops go on protecting it, and
+      // the yield waits for the sell that closes it
+      const held = this.enterResult;
+      const remaining = 1 - sellFraction;
+      this.enterResult = new ExecutionResult(
+        held.price,
+        held.baseAmount * remaining,
+        held.counterAmount * remaining,
+        held.feeAmount * remaining,
+      );
+      this.balance += netAmount;
+      return;
+    }
+
+    // Yield: everything the entries cost in, everything the sells realized out. Under QUOTE the
     // buy fee left the cash separately, so fold it into the realized output
     // (it's a realized cost of this round trip). Under RECEIVED
     // the buy fee was paid in base and is already reflected in the smaller net
     // base sold, so there is no quote buy fee to subtract here.
-    const invested = this.enterResult.counterAmount;
+    const invested = this.totalInvested;
     const buyFeeShare = this.enterQuoteBuyFee;
-    const output = netAmount - buyFeeShare;
+    const output = this.totalExitProceeds - buyFeeShare;
     const strategyYield = new DefaultStrategyYield(
       signal.instrument,
       this.config.currency,
@@ -499,7 +603,10 @@ export class BacktestExecutionPipeline implements ExecutionPipeline {
 
     this.balance += netAmount;
 
+    this.realizedPnl += output - invested;
     this.enterResult = null;
+    this.totalInvested = 0;
+    this.totalExitProceeds = 0;
     this.enterQuoteBuyFee = 0;
     this.status = ExecutionStatus.IDLE;
     this.cancelStops(signal.instrument);
